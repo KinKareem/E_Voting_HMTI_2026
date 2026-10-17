@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Konfirmasi Pendaftaran — Panel Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+
+<body>
+  <div class="admin-layout">
+    <div id="sidebar-root"></div>
+
+    <main class="dashboard-main">
+      <div class="dashboard-inner">
+        <header class="page-header">
+          <div>
+            <p class="page-eyebrow">Panel Admin</p>
+            <h1 class="page-title">Konfirmasi Pendaftaran</h1>
+            <p class="page-subtitle">
+              Setujui atau tolak mahasiswa yang baru melakukan registrasi akun.
+            </p>
+          </div>
+        </header>
+
+        <div id="konfirmasi-error" class="status-msg error hidden"></div>
+
+        <div class="table-card">
+          <div id="konfirmasi-content" class="empty-msg">Memuat data...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/Supabaseclient.js"></script>
+  <script src="../js/Sidebar.js"></script>
+  <script src="../js/Konfirmasi.js"></script>
+</body>
+
+</html>

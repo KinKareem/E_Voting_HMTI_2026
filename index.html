@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-Voting Ketua HMTI — Masuk / Daftar</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+  <main class="auth-page">
+    <div class="auth-card">
+      <!-- Panel brand (statis, sama untuk login & register) -->
+      <div class="brand-panel">
+        <div>
+          <p class="brand-eyebrow">E-Voting HMTI</p>
+          <h1 class="brand-title">Pemilihan Ketua HMTI Berbasis Blockchain</h1>
+          <div class="gold-rule"></div>
+          <p class="brand-description">
+            Satu suara, tercatat aman dan transparan. Masuk dengan NIM Anda untuk
+            menggunakan hak pilih.
+          </p>
+        </div>
+        <p class="brand-footer">Fakultas Teknik &middot; Universitas Udayana</p>
+      </div>
+
+      <!-- Panel form -->
+      <div class="form-panel">
+        <div class="tabs">
+          <button type="button" class="tab-btn active" data-mode="login" id="tab-login">
+            Masuk
+          </button>
+          <button type="button" class="tab-btn" data-mode="register" id="tab-register">
+            Daftar
+          </button>
+        </div>
+
+        <div class="auth-track-wrap">
+          <div class="auth-track" id="auth-track">
+            <!-- Pane: LOGIN -->
+            <div class="auth-pane">
+              <form id="login-form">
+                <h2 class="pane-title">Masuk</h2>
+                <p class="pane-subtitle">Gunakan NIM dan password yang telah didaftarkan.</p>
+
+                <div id="login-status" class="status-msg hidden"></div>
+
+                <div class="field">
+                  <label for="login-nim">NIM</label>
+                  <input type="text" id="login-nim" placeholder="2305551xxx" required />
+                </div>
+                <div class="field">
+                  <label for="login-password">Password</label>
+                  <input type="password" id="login-password" placeholder="••••••••" required />
+                </div>
+                <div class="field-forgot">
+                  <a href="forgot-password.html">Lupa password?</a>
+                </div>
+
+                <button type="submit" class="btn-primary" id="login-submit">Masuk</button>
+              </form>
+            </div>
+
+            <!-- Pane: REGISTER -->
+            <div class="auth-pane">
+              <form id="register-form">
+                <h2 class="pane-title">Daftar Akun</h2>
+                <p class="pane-subtitle">
+                  Akun Anda perlu dikonfirmasi admin sebelum bisa digunakan login.
+                </p>
+
+                <div id="register-status" class="status-msg hidden"></div>
+
+                <div class="field">
+                  <label for="reg-nim">NIM</label>
+                  <input type="text" id="reg-nim" placeholder="2305551xxx" required />
+                </div>
+                <div class="field">
+                  <label for="reg-nama">Nama Lengkap</label>
+                  <input type="text" id="reg-nama" placeholder="Nama sesuai KTM" required />
+                </div>
+                <div class="field">
+                  <label for="reg-email">Email</label>
+                  <input type="email" id="reg-email" placeholder="nama@student.unud.ac.id" required />
+                </div>
+                <div class="field">
+                  <label for="reg-password">Password</label>
+                  <input type="password" id="reg-password" placeholder="Minimal 6 karakter" required />
+                </div>
+                <div class="field">
+                  <label for="reg-confirm-password">Konfirmasi Password</label>
+                  <input type="password" id="reg-confirm-password" placeholder="Ulangi password" required />
+                </div>
+
+                <button type="submit" class="btn-primary" id="register-submit">Daftar</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/Supabaseclient.js"></script>
+  <script src="js/Auth.js"></script>
+  <script src="js/Userpage.js"></script>
+</body>
+
+</html>

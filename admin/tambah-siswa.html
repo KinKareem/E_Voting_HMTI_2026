@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tambah Siswa — Panel Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+
+<body>
+  <div class="admin-layout">
+    <div id="sidebar-root"></div>
+
+    <main class="dashboard-main">
+      <div class="dashboard-inner">
+        <header class="page-header">
+          <div>
+            <p class="page-eyebrow">Panel Admin</p>
+            <h1 class="page-title">Tambah Siswa</h1>
+            <p class="page-subtitle">
+              Unggah data mahasiswa secara massal melalui file CSV sesuai format yang ditentukan.
+            </p>
+          </div>
+        </header>
+
+        <div class="upload-card">
+          <div class="upload-card-head">
+            <div>
+              <p style="margin: 0; font-size: 14px; font-weight: 500; color: var(--bark-900)">
+                Format kolom CSV yang diminta:
+              </p>
+              <p class="upload-format">nim, nama_lengkap, prodi, angkatan</p>
+            </div>
+            <button class="btn-outline" id="download-template-btn">Unduh Template CSV</button>
+          </div>
+
+          <label class="dropzone" id="dropzone">
+            <span class="dz-title" id="dz-title">Klik untuk memilih file CSV</span>
+            <span class="dz-subtitle">atau seret file ke area ini</span>
+            <input type="file" accept=".csv" id="csv-input" style="display: none" />
+          </label>
+
+          <div id="parse-error" class="status-msg error hidden" style="margin-top: 16px"></div>
+        </div>
+
+        <div class="table-card hidden" id="preview-card">
+          <div class="preview-head">
+            <p id="preview-count" style="margin: 0; font-size: 14px; font-weight: 500; color: var(--bark-900)"></p>
+            <button class="btn-primary" id="import-btn" style="width: auto; padding: 9px 18px">
+              Impor ke Database
+            </button>
+          </div>
+          <div class="table-scroll">
+            <div id="preview-content"></div>
+          </div>
+          <p class="preview-note hidden" id="preview-note"></p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="../js/Supabaseclient.js"></script>
+  <script src="../js/Sidebar.js"></script>
+  <script src="../js/Tambahsiswa.js"></script>
+</body>
+
+</html>

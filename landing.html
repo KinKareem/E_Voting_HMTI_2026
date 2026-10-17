@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-Voting Ketua HMTI</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/landing.css" />
+</head>
+
+<body>
+  <!-- ===================== HEADER ===================== -->
+  <header class="landing-header" id="landing-header">
+    <div class="landing-header-inner">
+      <a href="#beranda" class="brand-mark">
+        <span class="brand-mark-eyebrow">E-Voting</span>
+        <span class="brand-mark-title">HMTI</span>
+      </a>
+
+      <nav class="landing-nav" aria-label="Navigasi halaman">
+        <a href="#kandidat">Kandidat</a>
+        <a href="#aktivitas">Aktivitas Pemilu</a>
+      </nav>
+
+      <div class="user-area">
+        <div class="user-avatar" id="user-avatar" aria-hidden="true">?</div>
+        <div class="user-meta">
+          <p class="user-name" id="user-name">Memuat...</p>
+          <p class="user-nim" id="user-nim"></p>
+        </div>
+        <button type="button" class="btn-header-logout" id="logout-btn">Keluar</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===================== HERO ===================== -->
+    <section class="hero" id="beranda">
+      <div class="hero-ring" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <p class="hero-eyebrow">Pemilihan Ketua HMTI</p>
+        <h1 class="hero-title">Suaramu Menentukan Arah Himpunan</h1>
+        <p class="hero-text">
+          Kenali setiap pasangan calon, lalu gunakan hak suaramu. Satu mahasiswa, satu suara
+          &mdash; tercatat aman dan transparan.
+        </p>
+        <div class="hero-actions">
+          <a href="#kandidat" class="btn-hero">Lihat Kandidat</a>
+          <span class="status-chip" id="status-chip">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">Memeriksa status...</span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== KANDIDAT ===================== -->
+    <section class="section" id="kandidat">
+      <div>
+        <div class="section-head" data-reveal>
+          <p class="section-eyebrow">Pasangan Calon</p>
+          <h2 class="section-title">Kandidat Ketua &amp; Wakil Ketua</h2>
+          <div class="gold-rule"></div>
+        </div>
+
+        <div class="voted-banner hidden" id="voted-banner" role="status">
+          <strong>Terima kasih telah berpartisipasi.</strong>
+          Hak suara Anda sudah digunakan dan tidak dapat diubah.
+        </div>
+
+        <div id="kandidat-error" class="status-msg error hidden"></div>
+
+        <div class="kandidat-grid" id="kandidat-grid">
+          <div class="empty-state">
+            <p class="empty-text">Memuat data kandidat...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== LOG AKTIVITAS ADMIN ===================== -->
+    <section class="section section-log" id="aktivitas">
+      <div class="log-layout">
+        <div class="section-head" data-reveal>
+          <p class="section-eyebrow">Transparansi</p>
+          <h2 class="section-title">Riwayat Aktivitas Pemilu</h2>
+          <p class="section-desc">
+            Setiap pembukaan dan penutupan sesi voting oleh panitia tercatat di sini.
+          </p>
+          <div class="gold-rule"></div>
+        </div>
+
+        <ol class="log-list" id="log-list">
+          <li class="log-empty">Memuat riwayat...</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="landing-footer">
+    <div class="landing-footer-inner">
+      <div>
+        <p class="footer-brand">E-Voting HMTI</p>
+        <p class="footer-text">
+          Sistem Pemilihan Ketua HMTI Berbasis Blockchain &middot; Teknologi Informasi,
+          Fakultas Teknik, Universitas Udayana
+        </p>
+      </div>
+      <p class="footer-copy">&copy; <span id="footer-year">2026</span> HMTI. Seluruh hak dilindungi.</p>
+    </div>
+  </footer>
+
+  <!-- ===================== POPUP KONFIRMASI VOTING ===================== -->
+  <div class="modal-overlay hidden" id="vote-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="vote-title" id="vote-modal">
+      <!-- Tampilan 1: konfirmasi -->
+      <div id="vote-view-confirm">
+        <h2 class="modal-title" id="vote-title">Konfirmasi Pilihan Anda</h2>
+        <p class="modal-text">Anda akan memberikan suara untuk pasangan calon berikut:</p>
+
+        <div class="vote-summary">
+          <div class="vote-summary-number" id="vote-number">01</div>
+          <div>
+            <p class="vote-summary-name" id="vote-ketua"></p>
+            <p class="vote-summary-name" id="vote-wakil"></p>
+          </div>
+        </div>
+
+        <p class="modal-warning">
+          Suara yang sudah dikirim <strong>tidak dapat diubah atau dibatalkan</strong>. Pastikan
+          pilihan Anda sudah benar.
+        </p>
+
+        <div id="vote-error" class="status-msg error hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" id="vote-cancel">Batal</button>
+          <button type="button" class="btn-primary" id="vote-confirm">Ya, Kirim Suara</button>
+        </div>
+      </div>
+
+      <!-- Tampilan 2: berhasil -->
+      <div id="vote-view-success" class="hidden">
+        <h2 class="modal-title">Suara Berhasil Disimpan</h2>
+        <p class="modal-text">
+          Terima kasih telah menggunakan hak suara Anda dalam pemilihan Ketua HMTI.
+        </p>
+        <div class="modal-actions">
+          <button type="button" class="btn-primary" id="vote-done">Selesai</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/Supabaseclient.js"></script>
+  <script src="js/Landing.js"></script>
+</body>
+
+</html>

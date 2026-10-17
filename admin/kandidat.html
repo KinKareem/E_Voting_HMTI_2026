@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kandidat — Panel Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+
+<body>
+  <div class="admin-layout">
+    <div id="sidebar-root"></div>
+
+    <main class="dashboard-main">
+      <div class="dashboard-inner">
+        <header class="page-header">
+          <div>
+            <p class="page-eyebrow">Panel Admin</p>
+            <h1 class="page-title">Kandidat</h1>
+            <p class="page-subtitle">
+              Data pasangan calon Ketua &amp; Wakil Ketua HMTI yang akan tampil di halaman pemilih.
+            </p>
+          </div>
+          <button class="btn-primary" id="open-form-btn" style="width: auto; padding: 10px 18px">
+            + Tambah Kandidat
+          </button>
+        </header>
+
+        <div id="kandidat-grid" class="kandidat-grid">
+          <div class="empty-msg">Memuat data...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Popup form tambah kandidat -->
+  <div class="modal-overlay hidden" id="form-overlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="form-title">
+      <h2 class="modal-title" id="form-title">Tambah Kandidat</h2>
+      <p class="modal-text">Isi data pasangan calon. Kolom bertanda * wajib diisi.</p>
+
+      <div id="form-error" class="status-msg error hidden"></div>
+
+      <form id="kandidat-form" novalidate>
+        <div class="field">
+          <label for="f-nomor">Nomor Paslon *</label>
+          <input type="number" id="f-nomor" min="1" step="1" required />
+        </div>
+        <div class="field">
+          <label for="f-foto">
+            Foto Paslon <span class="field-hint">(opsional &middot; JPG/PNG/WEBP &middot; maks. 2 MB)</span>
+          </label>
+          <div class="photo-field">
+            <div class="photo-preview" id="foto-preview"><span>Belum ada foto</span></div>
+            <div class="photo-controls">
+              <input type="file" id="f-foto" accept="image/jpeg,image/png,image/webp" />
+              <p class="photo-hint">Gunakan foto potret pasangan calon agar wajah terlihat jelas.</p>
+              <button type="button" class="photo-remove hidden" id="foto-remove">Hapus foto</button>
+            </div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="f-ketua">Nama Ketua HMTI *</label>
+            <input type="text" id="f-ketua" required />
+          </div>
+          <div class="field">
+            <label for="f-wakil">Nama Wakil HMTI *</label>
+            <input type="text" id="f-wakil" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-visi">Visi *</label>
+          <textarea id="f-visi" rows="3" required></textarea>
+        </div>
+        <div class="field">
+          <label for="f-misi">Misi * <span class="field-hint">(satu poin misi per baris)</span></label>
+          <textarea id="f-misi" rows="5" required></textarea>
+        </div>
+        <div class="field">
+          <label for="f-catatan">Catatan Tambahan <span class="field-hint">(opsional)</span></label>
+          <textarea id="f-catatan" rows="2"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" id="form-cancel">Batal</button>
+          <button type="submit" class="btn-primary" id="form-submit">Simpan Kandidat</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Popup konfirmasi hapus kandidat -->
+  <div class="modal-overlay hidden" id="delete-overlay">
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-title"
+      aria-describedby="delete-text">
+      <h2 class="modal-title" id="delete-title">Hapus Kandidat?</h2>
+      <p class="modal-text" id="delete-text"></p>
+
+      <div id="delete-error" class="status-msg error hidden"></div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-outline" id="delete-cancel">Batal</button>
+        <button type="button" class="btn-danger-solid" id="delete-confirm">Ya, Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/Supabaseclient.js"></script>
+  <script src="../js/Sidebar.js"></script>
+  <script src="../js/Kandidat.js"></script>
+</body>
+
+</html>
