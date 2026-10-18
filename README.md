@@ -1,7 +1,5 @@
 # E-Voting HMTI — Versi HTML/CSS/JS Murni
 
-Tanpa React/Next.js — hanya HTML, CSS, dan JavaScript biasa. Library dimuat lewat `<script>` CDN (Supabase, PapaParse, GSAP), jadi **tidak perlu `npm install` atau proses build**.
-
 ## Struktur File
 
 ```
@@ -43,11 +41,11 @@ Skrip juga aman dijalankan berulang kali.
 
 | Tabel | Fungsi | Sebelumnya |
 |---|---|---|
-| `tb_pengguna` | Akun login mahasiswa & admin, status persetujuan, status sudah voting | `profiles` |
-| `tb_mahasiswa` | Data master mahasiswa hasil upload CSV (menu Tambah Siswa) | `mahasiswa_whitelist` |
+| `tb_pengguna` | Akun login mahasiswa & admin, status persetujuan, status sudah voting 
+| `tb_mahasiswa` | Data master mahasiswa hasil upload CSV (menu Tambah Siswa) 
 | `tb_kandidat` | Pasangan calon (menu Kandidat) | *baru* |
-| `tb_log_admin` | Riwayat buka/tutup sesi voting yang tampil di landing page | *baru* |
-| `tb_suara` | Suara anonim — **tidak punya kolom yang menunjuk ke pemilih** | *baru* |
+| `tb_log_admin` | Riwayat buka/tutup sesi voting yang tampil di landing page 
+| `tb_suara` | Suara anonim — **tidak punya kolom yang menunjuk ke pemilih** 
 
 ## 2. Kredensial Supabase
 
@@ -71,21 +69,3 @@ Pakai server lokal sederhana (membuka lewat `file://` bisa diblokir browser):
 3. Daftar mahasiswa di `index.html` → admin setujui lewat **Konfirmasi Pendaftaran**
 4. Login sebagai mahasiswa → masuk ke `landing.html`: nama tampil di header, kandidat tampil, klik **Pilih Paslon** → popup konfirmasi → **Ya, Kirim Suara**
 5. Menu **List Voting** menampilkan mahasiswa tsb berstatus *Sudah Voting*
-
-### Mencoba tampilan Riwayat Aktivitas
-
-Karena fitur buka/tutup sesi belum dibangun (akan menyusul bersama blockchain), isi log secara manual lewat SQL Editor untuk melihat tampilannya:
-
-```sql
-insert into public.tb_log_admin (jenis_aksi, wallet_address) values
-  ('buka_sesi',  '0x7A3f8b92c1d4e5f6a7b8c9d0e1f2a3b4c5d69e21'),
-  ('tutup_sesi', '0x7A3f8b92c1d4e5f6a7b8c9d0e1f2a3b4c5d69e21');
-```
-
-Landing page memperbarui log otomatis tiap 30 detik. Kolom `wallet_address` boleh kosong; jika diisi, tampil terpotong (`0x7A3f...9e21`).
-
-## 5. Catatan Penting (Status Fase Ini)
-
-- **Pengiriman suara masih sementara.** Saat ini suara disimpan lewat fungsi database `fn_kirim_suara` ke tabel `tb_suara` (tanpa identitas pemilih), dan akun ditandai `has_voted = true` dalam satu transaksi — sehingga *one person, one vote* sudah ditegakkan di sisi server. Pada fase blockchain, bagian "simpan ke `tb_suara`" akan diganti pengiriman ke smart contract.
-- **Voting belum dibatasi sesi.** Karena menu buka/tutup sesi belum ada, pemilih yang sudah login bisa memberi suara kapan saja. Pembatasan ini ditambahkan saat fitur sesi dibangun.
-- **Registrasi admin masih terbuka** (sesuai spesifikasi awal: admin tanpa konfirmasi) — artinya siapa pun yang tahu alamat `admin.html` bisa mendaftar sebagai admin. Disarankan menambah kode rahasia pendaftaran atau mengunci pendaftaran admin sebelum dipakai sungguhan.
