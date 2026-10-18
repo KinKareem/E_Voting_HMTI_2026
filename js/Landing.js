@@ -7,7 +7,9 @@
    2. Header: nama user yang sedang login
    3. Daftar kandidat dari tabel tb_kandidat
    4. Popup konfirmasi sebelum suara dikirim (cegah salah klik)
-   5. Riwayat aktivitas admin dari tabel tb_log_admin
+   5. Status sesi voting (tb_sesi_voting) yang menentukan apakah tombol
+      "Pilih" aktif, dan riwayat buka/tutup sesi yang dibaca LANGSUNG dari
+      blockchain (kontrak VotingSession) tanpa lewat server aplikasi
    6. Animasi GSAP + ScrollTrigger (otomatis dilewati jika library
       gagal dimuat atau user mengaktifkan "reduce motion")
    ========================================================= */
@@ -26,6 +28,8 @@ let selectedKandidat = null;
 let isSubmitting = false;
 let lastFocusedEl = null;
 let lastLogSignature = null;
+let sesiStatus = null; // "belum_mulai" | "berlangsung" | "selesai" | null (tidak diketahui)
+let chainStatusKey = null; // status sesi menurut blockchain (null jika belum terbaca)
 let kandidatAnimated = false;
 let logAnimated = false;
 
@@ -37,6 +41,10 @@ const el = {
   statusDot: document.getElementById("status-dot"),
   statusText: document.getElementById("status-text"),
   votedBanner: document.getElementById("voted-banner"),
+  sessionDot: document.getElementById("session-dot"),
+  sessionText: document.getElementById("session-text"),
+  sessionNotice: document.getElementById("session-notice"),
+  chainNote: document.getElementById("chain-note"),
   kandidatGrid: document.getElementById("kandidat-grid"),
   kandidatError: document.getElementById("kandidat-error"),
   logList: document.getElementById("log-list"),
@@ -95,12 +103,16 @@ async function init() {
   updateVoteState();
   playIntroAnimation();
 
-  await Promise.all([loadKandidat(), loadLog()]);
+  await Promise.all([loadKandidat(), loadSesi(), loadLog()]);
+  updateChainNote();
   revealSectionHeads();
   if (hasScrollTrigger) ScrollTrigger.refresh();
 
-  setInterval(() => {
-    if (!document.hidden) loadLog();
+  // Segarkan status sesi & riwayat secara berkala (admin bisa membuka/menutup sesi kapan saja)
+  setInterval(async () => {
+    if (document.hidden) return;
+    await Promise.all([loadSesi(), loadLog()]);
+    updateChainNote();
   }, LOG_REFRESH_MS);
 }
 
@@ -124,22 +136,61 @@ function renderUser() {
     .toUpperCase();
 }
 
-// Dipanggil saat awal & setelah suara berhasil dikirim
+const SESI_INFO = {
+  belum_mulai: {
+    chip: "Sesi voting: belum dibuka",
+    dot: "",
+    button: "Sesi belum dibuka",
+    notice: "Sesi voting belum dibuka. Anda dapat mempelajari profil kandidat; tombol pilih akan aktif saat panitia membuka sesi.",
+  },
+  berlangsung: { chip: "Sesi voting: sedang berlangsung", dot: "open", button: null, notice: null },
+  selesai: {
+    chip: "Sesi voting: telah ditutup",
+    dot: "ended",
+    button: "Sesi telah ditutup",
+    notice: "Sesi voting telah ditutup. Terima kasih atas partisipasi Anda.",
+  },
+};
+const SESI_UNKNOWN = {
+  chip: "Sesi voting: tidak diketahui",
+  dot: "ended",
+  button: "Status sesi tidak diketahui",
+  notice: "Status sesi voting tidak dapat dimuat. Muat ulang halaman ini.",
+};
+
+// Dipanggil saat awal, setelah suara terkirim, dan setiap status sesi diperbarui
 function updateVoteState() {
   const voted = profile.has_voted;
+  const sesi = SESI_INFO[sesiStatus] || SESI_UNKNOWN;
+  const sessionOpen = sesiStatus === "berlangsung";
 
+  // Chip status hak suara
   el.statusDot.classList.toggle("voted", voted);
   el.statusText.textContent = voted
     ? "Hak suara Anda sudah digunakan"
     : "Hak suara Anda belum digunakan";
   el.votedBanner.classList.toggle("hidden", !voted);
 
+  // Chip & pemberitahuan status sesi
+  el.sessionDot.className = `status-dot ${sesi.dot}`.trim();
+  el.sessionText.textContent = sesi.chip;
+  el.sessionNotice.textContent = sesi.notice || "";
+  el.sessionNotice.classList.toggle("hidden", !sesi.notice);
+
+  // Tombol pilih aktif hanya jika sesi berlangsung DAN pemilih belum memilih
   document.querySelectorAll(".btn-vote").forEach((btn) => {
-    btn.disabled = voted;
-    btn.textContent = voted
-      ? "Hak suara sudah digunakan"
-      : `Pilih Paslon ${formatNomor(btn.dataset.nomor)}`;
+    btn.disabled = voted || !sessionOpen;
+    if (voted) btn.textContent = "Hak suara sudah digunakan";
+    else if (!sessionOpen) btn.textContent = sesi.button;
+    else btn.textContent = `Pilih Paslon ${formatNomor(btn.dataset.nomor)}`;
   });
+}
+
+// Status sesi dari database (dipakai server untuk menolak suara di luar sesi)
+async function loadSesi() {
+  const { data, error } = await sb.from("tb_sesi_voting").select("*").eq("id", 1).single();
+  sesiStatus = error || !data ? null : data.status;
+  updateVoteState();
 }
 
 // =========================================================
@@ -257,7 +308,7 @@ el.kandidatGrid.addEventListener("click", (e) => {
 // 4. POPUP KONFIRMASI VOTING
 // =========================================================
 function openVoteModal(kandidat, triggerEl) {
-  if (profile.has_voted) return;
+  if (profile.has_voted || sesiStatus !== "berlangsung") return;
 
   selectedKandidat = kandidat;
   lastFocusedEl = triggerEl;
@@ -329,6 +380,13 @@ async function submitVote() {
       updateVoteState();
       el.btnConfirm.disabled = true;
     }
+
+    // Kasus: sesi ternyata sudah ditutup/belum dibuka (status berubah saat popup terbuka)
+    if (error.message.toLowerCase().includes("sesi voting")) {
+      await loadSesi();
+      updateChainNote();
+      el.btnConfirm.disabled = true;
+    }
     return;
   }
 
@@ -376,54 +434,69 @@ document.addEventListener("keydown", (e) => {
 });
 
 // =========================================================
-// 5. RIWAYAT AKTIVITAS ADMIN
+// 5. RIWAYAT SESI DARI BLOCKCHAIN
 // =========================================================
 const LOG_TYPES = {
   buka_sesi: { title: "Sesi voting telah dibuka", cls: "log-open", icon: iconUnlocked() },
   tutup_sesi: { title: "Sesi voting telah ditutup", cls: "log-close", icon: iconLocked() },
 };
 
-async function loadLog() {
-  const { data, error } = await sb
-    .from("tb_log_admin")
-    .select("*")
-    .order("waktu", { ascending: false })
-    .limit(20);
+function renderLogMessage(text) {
+  el.logList.innerHTML = `<li class="log-empty">${escapeHtml(text)}</li>`;
+}
 
-  if (error) {
+// Riwayat dibaca langsung dari kontrak lewat RPC publik, BUKAN dari database aplikasi,
+// sehingga tidak bisa diubah-ubah oleh pengelola server.
+async function loadLog() {
+  const problem = blockchainConfigProblem();
+  if (problem) {
+    lastLogSignature = "tidak-dikonfigurasi";
+    chainStatusKey = null;
+    renderLogMessage(
+      blockchainConfigCode() === "no_address"
+        ? "Kontrak blockchain belum dikonfigurasi oleh panitia."
+        : "Riwayat tidak dapat dimuat dari blockchain saat ini."
+    );
+    return;
+  }
+
+  let state;
+  try {
+    state = await readSessionState(getSessionContract());
+  } catch (e) {
+    chainStatusKey = null;
     if (lastLogSignature === null) {
-      el.logList.innerHTML = `<li class="log-empty">Riwayat aktivitas belum dapat dimuat.</li>`;
+      renderLogMessage("Riwayat belum dapat dimuat dari blockchain. Coba muat ulang halaman.");
     }
     return;
   }
+  chainStatusKey = state.statusKey;
+
+  // Entri terbaru di atas
+  const entries = [];
+  if (state.closedAt) entries.push({ jenis: "tutup_sesi", at: state.closedAt, wallet: state.closedBy });
+  if (state.openedAt) entries.push({ jenis: "buka_sesi", at: state.openedAt, wallet: state.openedBy });
 
   // Hindari render ulang (dan kedipan) bila data tidak berubah
-  const signature = (data || []).map((d) => d.id).join("|");
+  const signature = entries.map((x) => `${x.jenis}:${x.at}`).join("|") || "kosong";
   if (signature === lastLogSignature) return;
   lastLogSignature = signature;
 
-  if (!data || data.length === 0) {
-    el.logList.innerHTML = `<li class="log-empty">Belum ada aktivitas admin. Riwayat pembukaan dan penutupan sesi voting akan muncul di sini.</li>`;
+  if (entries.length === 0) {
+    renderLogMessage("Belum ada aktivitas. Pembukaan dan penutupan sesi voting akan muncul di sini.");
     return;
   }
 
-  el.logList.innerHTML = data
+  el.logList.innerHTML = entries
     .map((item) => {
-      const type = LOG_TYPES[item.jenis_aksi] || {
-        title: item.jenis_aksi,
-        cls: "log-open",
-        icon: iconUnlocked(),
-      };
-      const wallet = item.wallet_address
-        ? `<p class="log-wallet">Wallet: ${escapeHtml(truncateWallet(item.wallet_address))}</p>`
-        : "";
+      const type = LOG_TYPES[item.jenis];
       return `
         <li class="log-item">
           <span class="log-icon ${type.cls}">${type.icon}</span>
           <div class="log-body">
             <p class="log-title">${type.title}</p>
-            <p class="log-meta">${formatWaktu(item.waktu)}</p>
-            ${wallet}
+            <p class="log-meta">${formatChainTime(item.at)}</p>
+            <p class="log-wallet">Wallet: ${escapeHtml(shortAddress(item.wallet))}</p>
           </div>
         </li>
       `;
@@ -433,6 +506,23 @@ async function loadLog() {
   if (!logAnimated) {
     logAnimated = true;
     animateOnScroll(el.logList.querySelectorAll(".log-item"), el.logList, { x: -24, y: 0 });
+  }
+}
+
+// Membandingkan status sesi di database aplikasi dengan blockchain.
+// Jika berbeda, pemilih diberi tahu (tanda kemungkinan data tidak konsisten).
+function updateChainNote() {
+  if (!chainStatusKey || !sesiStatus) {
+    el.chainNote.className = "chain-note hidden";
+    return;
+  }
+  if (chainStatusKey === sesiStatus) {
+    el.chainNote.className = "chain-note ok";
+    el.chainNote.textContent = "Status sesi di aplikasi sesuai dengan catatan di blockchain.";
+  } else {
+    el.chainNote.className = "chain-note warn";
+    el.chainNote.textContent =
+      "Peringatan: status sesi di aplikasi berbeda dengan catatan blockchain. Hubungi panitia sebelum memilih.";
   }
 }
 
@@ -453,13 +543,23 @@ function iconLocked() {
 // =========================================================
 // 6. ANIMASI (GSAP)
 // =========================================================
+// Setelah animasi selesai, style inline buatan GSAP dibuang supaya efek hover CSS
+// (properti `translate`) berfungsi kembali dan posisi akhir ditentukan CSS.
+const CLEAR_PROPS = "transform,translate,rotate,scale,opacity";
+
 function playIntroAnimation() {
   if (!canAnimate) return;
 
-  gsap.from("#landing-header", { y: -70, opacity: 0, duration: 0.7, ease: "power3.out" });
+  gsap.from("#landing-header", {
+    y: -70,
+    opacity: 0,
+    duration: 0.7,
+    ease: "power3.out",
+    clearProps: CLEAR_PROPS,
+  });
 
   gsap
-    .timeline({ defaults: { ease: "power3.out" }, delay: 0.15 })
+    .timeline({ defaults: { ease: "power3.out", clearProps: CLEAR_PROPS }, delay: 0.15 })
     .from(".hero-eyebrow", { y: 20, opacity: 0, duration: 0.6 })
     .from(".hero-title", { y: 34, opacity: 0, duration: 0.85 }, "-=0.3")
     .from(".hero-text", { y: 22, opacity: 0, duration: 0.65 }, "-=0.45")
@@ -473,54 +573,30 @@ function revealSectionHeads() {
   document.querySelectorAll("[data-reveal]").forEach((node) => animateOnScroll(node, node));
 }
 
-// Elemen muncul (fade + geser) saat area-nya masuk layar
 function animateOnScroll(targets, trigger, from = {}) {
   if (!canAnimate) return;
 
-  const config = {
-    opacity: 0,
-    y: 40,
+  const fromVars = { opacity: 0, y: 40, ...from };
+  const toVars = {
+    opacity: 1,
+    x: 0,
+    y: 0,
     duration: 0.7,
     ease: "power2.out",
     stagger: 0.14,
-    ...from,
+    clearProps: CLEAR_PROPS,
   };
 
   if (hasScrollTrigger) {
-    config.scrollTrigger = { trigger, start: "top 88%", once: true };
+    toVars.scrollTrigger = { trigger, start: "top 88%", once: true };
   }
 
-  gsap.from(targets, config);
+  gsap.fromTo(targets, fromVars, toVars);
 }
 
-// =========================================================
 // HELPER
-// =========================================================
 function formatNomor(n) {
   return String(n).padStart(2, "0");
-}
-
-function formatWaktu(iso) {
-  const d = new Date(iso);
-  const tanggal = d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Makassar",
-  });
-  const jam = d
-    .toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Makassar",
-    })
-    .replace(":", ".");
-  return `${tanggal}, ${jam} WITA`;
-}
-
-function truncateWallet(address) {
-  return address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
 }
 
 function escapeHtml(str) {

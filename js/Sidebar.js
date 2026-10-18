@@ -1,14 +1,11 @@
 /* =========================================================
    Sidebar.js
-   Merender sidebar admin ke dalam <div id="sidebar-root"></div>
-   yang ada di setiap halaman dashboard admin (konfirmasi.html,
-   list-voting.html, tambah-siswa.html). Juga menangani toggle
-   menu mobile dan tombol logout.
    ========================================================= */
 
 const MENU_ITEMS = [
   { href: "konfirmasi.html", label: "Konfirmasi Pendaftaran" },
   { href: "kandidat.html", label: "Kandidat" },
+  { href: "sesi-voting.html", label: "Sesi Voting" },
   { href: "list-voting.html", label: "List Voting" },
   { href: "tambah-siswa.html", label: "Tambah Siswa" },
 ];
@@ -96,6 +93,12 @@ function iconFor(href) {
       <path d="M16 14.6c2.7 0 5 1.8 5 4.9" stroke-linecap="round" />
     </svg>`;
   }
+  if (href === "sesi-voting.html") {
+    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.5l5 3.5-5 3.5z" stroke-linejoin="round" />
+    </svg>`;
+  }
   if (href === "list-voting.html") {
     return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
       <path d="M8 6h13M8 12h13M8 18h13" stroke-linecap="round" />
@@ -108,15 +111,6 @@ function iconFor(href) {
   </svg>`;
 }
 
-// ---------------------------------------------------------
-// Penjagaan akses: seluruh halaman dashboard hanya untuk admin yang sedang
-// login dan berstatus approved. Tanpa pemeriksaan ini, sesi yang hilang/habis
-// membuat halaman tampil KOSONG tanpa pesan apa pun (database hanya mengembalikan
-// daftar kosong, bukan error), sehingga data seolah-olah tidak ada.
-//
-// Hasilnya (Promise<boolean>) disimpan di window.adminReady. Halaman menunggu
-// ini sebelum memuat datanya, dan yang gagal otomatis dikirim ke halaman login.
-// ---------------------------------------------------------
 async function guardAdmin() {
   const goToLogin = () => {
     window.location.href = "../admin.html?sesi=habis";

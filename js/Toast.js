@@ -1,16 +1,4 @@
-/* =========================================================
-   Toast.js
-   Notifikasi kecil yang slide masuk dari kanan bawah layar.
-   Dipakai di semua halaman admin untuk memberi tahu hasil
-   sebuah tindakan (berhasil / gagal).
 
-   Pemakaian:
-     showToast("success", "Kandidat berhasil ditambahkan.");
-     showToast("error", "Gagal menyimpan data.");
-     showToast("info", "Template CSV diunduh.");
-
-   Style-nya ada di css/style.css (bagian TOAST).
-   ========================================================= */
 
 const TOAST_DURATION = { success: 4000, info: 4000, error: 6500 };
 const TOAST_MAX_VISIBLE = 4;
@@ -46,14 +34,13 @@ function showToast(type, message) {
   const kind = ["success", "error", "info"].includes(type) ? type : "info";
   const container = getToastContainer();
 
-  // Batasi jumlah toast yang tampil bersamaan
   while (container.children.length >= TOAST_MAX_VISIBLE) {
     removeToast(container.firstElementChild, true);
   }
 
   const toast = document.createElement("div");
   toast.className = `toast toast-${kind}`;
-  // Error dibacakan langsung oleh screen reader, sisanya menunggu jeda
+
   toast.setAttribute("role", kind === "error" ? "alert" : "status");
 
   toast.innerHTML = `
@@ -61,10 +48,9 @@ function showToast(type, message) {
     <p class="toast-message"></p>
     <button type="button" class="toast-close" aria-label="Tutup notifikasi">&times;</button>
   `;
-  toast.querySelector(".toast-message").textContent = message; // textContent: aman dari HTML injection
+  toast.querySelector(".toast-message").textContent = message;
   container.appendChild(toast);
 
-  // Pause timer saat kursor di atas toast supaya sempat dibaca
   let timer = null;
   const start = () => {
     timer = setTimeout(() => removeToast(toast), TOAST_DURATION[kind]);
@@ -78,7 +64,6 @@ function showToast(type, message) {
     removeToast(toast);
   });
 
-  // Frame berikutnya baru diberi class "show" agar transisi slide berjalan
   requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add("toast-show")));
   start();
 
@@ -92,7 +77,6 @@ function removeToast(toast, immediate = false) {
     return;
   }
   toast.classList.remove("toast-show");
-  // Hapus dari DOM setelah animasi keluar selesai (dengan cadangan timer)
   const done = () => toast.remove();
   toast.addEventListener("transitionend", done, { once: true });
   setTimeout(done, 500);

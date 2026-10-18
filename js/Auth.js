@@ -7,11 +7,7 @@
    ========================================================= */
 
 const Auth = {
-  /**
-   * Registrasi mahasiswa. Akun dibuat di Supabase Auth, tapi baris
-   * di tabel `tb_pengguna` diberi status "pending" sehingga loginByNim()
-   * akan menolak login sampai admin menyetujui.
-   */
+
   async registerMahasiswa({ nim, namaLengkap, email, password }) {
     const { data: signUpData, error: signUpError } = await sb.auth.signUp({
       email,
@@ -44,7 +40,6 @@ const Auth = {
       };
     }
 
-    // Sesi langsung dibuat oleh signUp; keluarkan dulu karena akun belum disetujui admin.
     await sb.auth.signOut();
 
     return {
@@ -54,9 +49,6 @@ const Auth = {
     };
   },
 
-  /**
-   * Registrasi admin — sama seperti mahasiswa tapi tanpa perlu approval.
-   */
   async registerAdmin({ nim, namaLengkap, email, password }) {
     const { data: signUpData, error: signUpError } = await sb.auth.signUp({
       email,
@@ -92,11 +84,7 @@ const Auth = {
     return { success: true, message: "Registrasi admin berhasil. Silakan login." };
   },
 
-  /**
-   * Login berbasis NIM + password, dipakai untuk mahasiswa & admin.
-   * expectedRole membatasi supaya akun mahasiswa tidak bisa login lewat
-   * form admin & sebaliknya.
-   */
+
   async loginByNim({ nim, password, expectedRole }) {
     const email = await getEmailByNim(nim);
     if (!email) {

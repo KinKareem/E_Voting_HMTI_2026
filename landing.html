@@ -58,6 +58,10 @@
             <span class="status-dot" id="status-dot"></span>
             <span id="status-text">Memeriksa status...</span>
           </span>
+          <span class="status-chip" id="session-chip">
+            <span class="status-dot" id="session-dot"></span>
+            <span id="session-text">Memeriksa sesi...</span>
+          </span>
         </div>
       </div>
     </section>
@@ -76,6 +80,8 @@
           Hak suara Anda sudah digunakan dan tidak dapat diubah.
         </div>
 
+        <div class="voted-banner session-notice hidden" id="session-notice" role="status"></div>
+
         <div id="kandidat-error" class="status-msg error hidden"></div>
 
         <div class="kandidat-grid" id="kandidat-grid">
@@ -93,8 +99,10 @@
           <p class="section-eyebrow">Transparansi</p>
           <h2 class="section-title">Riwayat Aktivitas Pemilu</h2>
           <p class="section-desc">
-            Setiap pembukaan dan penutupan sesi voting oleh panitia tercatat di sini.
+            Setiap pembukaan dan penutupan sesi voting oleh panitia dicatat permanen di
+            blockchain. Riwayat di bawah dibaca langsung dari sana, bukan dari server aplikasi.
           </p>
+          <p class="chain-note hidden" id="chain-note" role="status"></p>
           <div class="gold-rule"></div>
         </div>
 
@@ -164,7 +172,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
   <script src="js/Supabaseclient.js"></script>
+  <script src="js/Blockchainconfig.js"></script>
+  <script src="js/Blockchain.js"></script>
   <script src="js/Landing.js"></script>
 </body>
 

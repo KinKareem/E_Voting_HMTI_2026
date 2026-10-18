@@ -1,7 +1,6 @@
 /* =========================================================
    Adminpage.js
    Logic untuk admin.html — login & register admin, termasuk
-   animasi sliding antara kedua form di dalam box yang sama.
    ========================================================= */
 
 const tabLogin = document.getElementById("tab-login");
@@ -28,8 +27,7 @@ function hideStatus(elementId) {
   const el = document.getElementById(elementId);
   el.className = "status-msg hidden";
 }
-
-// Dialihkan dari dashboard karena sesi admin tidak ditemukan / sudah berakhir
+s
 if (new URLSearchParams(window.location.search).get("sesi") === "habis") {
   showStatus(
     "login-status",

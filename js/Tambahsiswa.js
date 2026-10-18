@@ -1,16 +1,4 @@
-/* =========================================================
-   Tambahsiswa.js
-   Logic untuk admin/tambah-siswa.html — mengunggah file CSV
-   dan melakukan bulk insert ke tabel tb_mahasiswa.
-   Menggunakan library PapaParse (lewat CDN) untuk parsing CSV.
-   ========================================================= */
 
-// =========================================================
-// NOTIFIKASI (TOAST) — slide masuk dari kanan bawah layar.
-// Ditulis langsung di halaman ini, tidak bergantung pada file lain.
-// Pemakaian: showToast("success" | "error" | "info", "pesan");
-// Tampilannya diatur di css/style.css (bagian TOAST).
-// =========================================================
 function showToast(type, message) {
   let box = document.getElementById("toast-container");
   if (!box) {
@@ -41,9 +29,8 @@ function showToast(type, message) {
 
   toast.append(icon, text, close);
   box.appendChild(toast);
-  while (box.children.length > 4) box.firstElementChild.remove(); // maksimal 4 sekaligus
+  while (box.children.length > 4) box.firstElementChild.remove();
 
-  // Hilang otomatis; berhenti dihitung saat kursor di atas toast supaya sempat dibaca
   const dismiss = () => {
     toast.classList.remove("toast-show");
     setTimeout(() => toast.remove(), 450);
@@ -58,7 +45,6 @@ function showToast(type, message) {
     dismiss();
   });
 
-  // Class "toast-show" ditambahkan di frame berikutnya agar transisi slide berjalan
   requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add("toast-show")));
 }
 

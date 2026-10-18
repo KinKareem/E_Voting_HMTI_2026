@@ -1,21 +1,8 @@
 /* =========================================================
    Kandidat.js
-   Logic untuk admin/kandidat.html:
-   - menampilkan card kandidat dari tabel tb_kandidat
-   - form tambah & edit kandidat (termasuk upload foto)
-   - hapus kandidat dengan popup konfirmasi
-   - notifikasi hasil tindakan lewat showToast() (ada di bagian atas file ini)
-
-   Foto disimpan di Supabase Storage (bucket "foto-kandidat"),
-   sedangkan lokasi filenya dicatat di kolom tb_kandidat.foto_path.
+   Logic untuk admin/kandidat.html
    ========================================================= */
 
-// =========================================================
-// NOTIFIKASI (TOAST) — slide masuk dari kanan bawah layar.
-// Ditulis langsung di halaman ini, tidak bergantung pada file lain.
-// Pemakaian: showToast("success" | "error" | "info", "pesan");
-// Tampilannya diatur di css/style.css (bagian TOAST).
-// =========================================================
 function showToast(type, message) {
   let box = document.getElementById("toast-container");
   if (!box) {
@@ -36,7 +23,7 @@ function showToast(type, message) {
 
   const text = document.createElement("p");
   text.className = "toast-message";
-  text.textContent = message; // textContent: aman dari HTML injection
+  text.textContent = message;
 
   const close = document.createElement("button");
   close.type = "button";
@@ -46,9 +33,8 @@ function showToast(type, message) {
 
   toast.append(icon, text, close);
   box.appendChild(toast);
-  while (box.children.length > 4) box.firstElementChild.remove(); // maksimal 4 sekaligus
+  while (box.children.length > 4) box.firstElementChild.remove();
 
-  // Hilang otomatis; berhenti dihitung saat kursor di atas toast supaya sempat dibaca
   const dismiss = () => {
     toast.classList.remove("toast-show");
     setTimeout(() => toast.remove(), 450);
@@ -63,7 +49,6 @@ function showToast(type, message) {
     dismiss();
   });
 
-  // Class "toast-show" ditambahkan di frame berikutnya agar transisi slide berjalan
   requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add("toast-show")));
 }
 
@@ -93,18 +78,16 @@ const deleteCancelBtn = document.getElementById("delete-cancel");
 const deleteConfirmBtn = document.getElementById("delete-confirm");
 
 let kandidatList = [];
-let editingKandidat = null; // null = mode tambah
-let selectedFile = null; // foto baru yang dipilih di form
-let removeExistingFoto = false; // admin menekan "Hapus foto" saat edit
+let editingKandidat = null;
+let selectedFile = null;
+let removeExistingFoto = false;
 let previewObjectUrl = null;
 let deleteTarget = null;
 let isSaving = false;
 let isDeleting = false;
 let lastFocusedEl = null;
 
-// ---------------------------------------------------------
 // Memuat & menampilkan daftar kandidat
-// ---------------------------------------------------------
 async function loadKandidat() {
   const { data, error } = await sb
     .from("tb_kandidat")
@@ -198,7 +181,7 @@ function kandidatCardHtml(k) {
   `;
 }
 
-// Satu listener untuk semua tombol Edit/Hapus di card (event delegation)
+// listener untuk semua tombol Edit/Hapus di card
 gridEl.addEventListener("click", (e) => {
   const editBtn = e.target.closest(".btn-edit");
   const deleteBtn = e.target.closest(".btn-delete");
@@ -211,9 +194,7 @@ gridEl.addEventListener("click", (e) => {
   }
 });
 
-// ---------------------------------------------------------
 // Form tambah / edit
-// ---------------------------------------------------------
 function openForm(kandidat, triggerEl) {
   editingKandidat = kandidat || null;
   lastFocusedEl = triggerEl || openBtn;
@@ -305,7 +286,7 @@ function releasePreviewUrl() {
   }
 }
 
-// Menampilkan foto baru (jika dipilih), foto lama (saat edit), atau placeholder
+
 function refreshFotoPreview() {
   releasePreviewUrl();
 
@@ -379,15 +360,13 @@ formEl.addEventListener("submit", async (e) => {
       payload.foto_path = null;
     }
 
-    // 2) Simpan data. .select() dipakai untuk memastikan baris benar-benar tersimpan
-    //    (jika izin database menolak, Supabase tidak melempar error, hanya 0 baris).
+    // 2) Simpan data kandidat ke Supabase
     const query = isEdit
       ? sb.from("tb_kandidat").update(payload).eq("id", editingKandidat.id).select()
       : sb.from("tb_kandidat").insert(payload).select();
     const { data, error } = await query;
 
     if (error) {
-      // 23505 = unique_violation (nomor paslon sudah dipakai)
       throw new Error(
         error.code === "23505" ? `Nomor paslon ${nomor} sudah dipakai kandidat lain.` : error.message
       );
@@ -396,7 +375,6 @@ formEl.addEventListener("submit", async (e) => {
       throw new Error("Perubahan tidak tersimpan. Pastikan Anda login sebagai admin.");
     }
 
-    // 3) Berhasil: bersihkan foto lama yang sudah tidak dipakai
     if (oldPath && oldPath !== payload.foto_path) await removeFotoFile(oldPath);
 
     isSaving = false;
@@ -409,7 +387,7 @@ formEl.addEventListener("submit", async (e) => {
     );
     await loadKandidat();
   } catch (err) {
-    // Gagal setelah foto terlanjur terunggah: hapus agar tidak jadi file yatim
+
     if (uploadedPath) await removeFotoFile(uploadedPath);
     showFormError(err.message);
   } finally {
@@ -420,9 +398,7 @@ formEl.addEventListener("submit", async (e) => {
   }
 });
 
-// ---------------------------------------------------------
 // Hapus kandidat
-// ---------------------------------------------------------
 function openDelete(kandidat, triggerEl) {
   deleteTarget = kandidat;
   lastFocusedEl = triggerEl;
@@ -436,7 +412,7 @@ function openDelete(kandidat, triggerEl) {
   deleteConfirmBtn.textContent = "Ya, Hapus";
 
   deleteOverlayEl.classList.remove("hidden");
-  deleteCancelBtn.focus(); // fokus awal di aksi yang aman
+  deleteCancelBtn.focus();
 }
 
 function closeDelete() {
@@ -469,7 +445,6 @@ deleteConfirmBtn.addEventListener("click", async () => {
   if (error || !data || data.length === 0) {
     let message = "Kandidat tidak terhapus. Pastikan Anda login sebagai admin.";
     if (error) {
-      // 23503 = foreign_key_violation (kandidat sudah punya suara di tb_suara)
       message =
         error.code === "23503"
           ? "Kandidat ini sudah menerima suara sehingga tidak dapat dihapus."
@@ -500,7 +475,6 @@ document.addEventListener("keydown", (e) => {
 // Helper
 // ---------------------------------------------------------
 // Menghapus file foto di Storage. Kegagalan tidak menggagalkan proses utama
-// (paling buruk tersisa file yatim), jadi hanya dicatat di console.
 async function removeFotoFile(path) {
   try {
     const { error } = await sb.storage.from(BUCKET).remove([path]);
@@ -539,7 +513,6 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Untuk nilai di dalam atribut HTML (escapeHtml tidak meng-escape tanda kutip)
 function escapeAttr(str) {
   return escapeHtml(str).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

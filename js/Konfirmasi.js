@@ -1,15 +1,8 @@
 /* =========================================================
    Konfirmasi.js
    Logic untuk admin/konfirmasi.html — menyetujui/menolak
-   pendaftaran mahasiswa yang berstatus "pending".
    ========================================================= */
 
-// =========================================================
-// NOTIFIKASI (TOAST) — slide masuk dari kanan bawah layar.
-// Ditulis langsung di halaman ini, tidak bergantung pada file lain.
-// Pemakaian: showToast("success" | "error" | "info", "pesan");
-// Tampilannya diatur di css/style.css (bagian TOAST).
-// =========================================================
 function showToast(type, message) {
   let box = document.getElementById("toast-container");
   if (!box) {
@@ -30,7 +23,7 @@ function showToast(type, message) {
 
   const text = document.createElement("p");
   text.className = "toast-message";
-  text.textContent = message; // textContent: aman dari HTML injection
+  text.textContent = message;
 
   const close = document.createElement("button");
   close.type = "button";
@@ -40,9 +33,9 @@ function showToast(type, message) {
 
   toast.append(icon, text, close);
   box.appendChild(toast);
-  while (box.children.length > 4) box.firstElementChild.remove(); // maksimal 4 sekaligus
+  while (box.children.length > 4) box.firstElementChild.remove();
 
-  // Hilang otomatis; berhenti dihitung saat kursor di atas toast supaya sempat dibaca
+
   const dismiss = () => {
     toast.classList.remove("toast-show");
     setTimeout(() => toast.remove(), 450);
@@ -57,7 +50,6 @@ function showToast(type, message) {
     dismiss();
   });
 
-  // Class "toast-show" ditambahkan di frame berikutnya agar transisi slide berjalan
   requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add("toast-show")));
 }
 
@@ -116,8 +108,6 @@ function renderTable() {
     )
     .join("");
 
-  // innerHTML (bukan outerHTML): contentEl harus tetap menjadi wadah yang sama
-  // di dalam halaman supaya render berikutnya (setelah setuju/tolak) tetap berfungsi.
   contentEl.className = "";
   contentEl.innerHTML = `
     <table class="data-table">
@@ -144,8 +134,7 @@ async function handleDecision(id, decision) {
   const buttons = document.querySelectorAll(`[data-id="${id}"]`);
   buttons.forEach((b) => (b.disabled = true));
 
-  // .select() dipakai untuk memastikan baris benar-benar berubah
-  // (jika izin database menolak, Supabase tidak melempar error, hanya 0 baris).
+
   const { data, error } = await sb
     .from("tb_pengguna")
     .update({ status: decision })
@@ -161,7 +150,7 @@ async function handleDecision(id, decision) {
     return;
   }
 
-  // Perbarui tampilan dulu, lalu beri tahu admin lewat toast
+
   pendingList = pendingList.filter((p) => p.id !== id);
   renderTable();
 
