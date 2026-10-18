@@ -1,28 +1,4 @@
--- =========================================================
--- SKEMA DATABASE: Sistem E-Voting Ketua HMTI
--- Jalankan SELURUH file ini di Supabase SQL Editor.
---
--- File ini AMAN dijalankan:
---   * di database baru (kosong), maupun
---   * di database lama Anda yang masih memakai tabel `profiles` dan
---     `mahasiswa_whitelist` -> tabel otomatis di-rename, data tetap utuh.
---   * berulang kali (idempoten).
---
--- Penamaan tabel:
---   tb_pengguna    : akun login (mahasiswa & admin), status persetujuan, status sudah voting
---   tb_mahasiswa   : data master mahasiswa hasil upload CSV (menu "Tambah Siswa")
---   tb_kandidat    : data pasangan calon + foto (menu "Kandidat")
---   tb_sesi_voting : status sesi voting (salinan dari blockchain, dipakai server
---                    untuk menolak suara di luar sesi). Hanya satu baris (id = 1).
---   tb_log_admin   : (tidak lagi dipakai landing page; riwayat sesi kini dibaca
---                    langsung dari blockchain). Aman dibiarkan atau dihapus.
---   tb_suara       : suara anonim (TANPA kolom yang menunjuk ke pemilih)
--- =========================================================
 
-
--- ---------------------------------------------------------
--- 0. MIGRASI NAMA TABEL LAMA (diabaikan otomatis jika tidak ada)
--- ---------------------------------------------------------
 do $$
 begin
   if to_regclass('public.profiles') is not null
@@ -82,13 +58,9 @@ create table if not exists public.tb_kandidat (
   created_at timestamptz not null default now()
 );
 
--- Untuk database lama yang tabel tb_kandidat-nya dibuat sebelum ada kolom foto.
--- foto_path berisi lokasi file di Supabase Storage (bucket "foto-kandidat").
 alter table public.tb_kandidat add column if not exists foto_path text;
 
 -- Riwayat aktivitas admin yang ditampilkan di landing page.
--- wallet_address sengaja boleh kosong: kolom ini akan terisi saat integrasi
--- blockchain dibangun (alamat wallet admin yang mengeksekusi smart contract).
 create table if not exists public.tb_log_admin (
   id uuid primary key default gen_random_uuid(),
   jenis_aksi text not null check (jenis_aksi in ('buka_sesi', 'tutup_sesi')),
@@ -99,20 +71,13 @@ create table if not exists public.tb_log_admin (
 
 create index if not exists tb_log_admin_waktu_idx on public.tb_log_admin (waktu desc);
 
--- Suara anonim. SENGAJA tidak ada kolom pengguna maupun timestamp, supaya
--- suara tidak bisa dicocokkan ke pemilih. Tabel ini adalah penampung sementara
--- sampai pengiriman suara dialihkan ke blockchain pada fase berikutnya.
+
 create table if not exists public.tb_suara (
   id uuid primary key default gen_random_uuid(),
   kandidat_id uuid not null references public.tb_kandidat (id)
 );
 
--- Status sesi voting. SUMBER KEBENARAN-nya adalah kontrak di blockchain; tabel ini
--- adalah salinan yang diperbarui halaman admin "Sesi Voting" SETELAH transaksi
--- terkonfirmasi, supaya fungsi fn_kirim_suara bisa menolak suara di luar sesi
--- (database tidak bisa membaca blockchain secara langsung).
--- Landing page membandingkan salinan ini dengan blockchain dan menampilkan
--- peringatan jika keduanya berbeda.
+
 create table if not exists public.tb_sesi_voting (
   id integer primary key default 1 check (id = 1), -- hanya boleh ada satu baris
   status text not null default 'belum_mulai'
@@ -133,8 +98,6 @@ insert into public.tb_sesi_voting (id) values (1) on conflict (id) do nothing;
 -- 2. FUNGSI BANTU
 -- ---------------------------------------------------------
 
--- Cek apakah user yang sedang login adalah admin. SECURITY DEFINER supaya
--- tidak memicu rekursi RLS saat dipakai di dalam policy tabel tb_pengguna.
 create or replace function public.is_admin()
 returns boolean
 language sql
@@ -150,8 +113,7 @@ $$;
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to authenticated;
 
--- Lookup email dari NIM (login & lupa password memakai NIM, sedangkan
--- Supabase Auth berbasis email). Hanya mengembalikan email.
+
 create or replace function public.get_email_by_nim(input_nim text)
 returns text
 language sql
@@ -164,10 +126,7 @@ $$;
 revoke all on function public.get_email_by_nim(text) from public;
 grant execute on function public.get_email_by_nim(text) to anon, authenticated;
 
--- Menjaga salinan status sesi agar meniru aturan kontrak blockchain:
---  * status hanya maju: belum_mulai -> berlangsung -> selesai (tidak pernah mundur,
---    sesi yang sudah selesai tidak bisa dibuka lagi)
---  * catatan waktu/wallet/transaksi yang sudah terisi tidak bisa diubah
+
 create or replace function public.fn_jaga_transisi_sesi()
 returns trigger
 language plpgsql
@@ -198,10 +157,6 @@ create trigger trg_jaga_transisi_sesi
   before update on public.tb_sesi_voting
   for each row execute function public.fn_jaga_transisi_sesi();
 
--- Mengirim suara. Dalam SATU transaksi: tandai pemilih sudah memilih
--- (one person, one vote) dan simpan suara anonim (hanya id kandidat).
--- Pemilih tidak bisa menulis ke tb_suara / mengubah has_voted secara langsung;
--- satu-satunya jalur adalah fungsi ini.
 create or replace function public.fn_kirim_suara(p_kandidat_id uuid)
 returns text
 language plpgsql
@@ -254,7 +209,6 @@ alter table public.tb_log_admin enable row level security;
 alter table public.tb_suara enable row level security;  -- tanpa policy: tidak bisa diakses langsung
 alter table public.tb_sesi_voting enable row level security;
 
--- Bersihkan policy lama (nama lama maupun nama baru) agar skrip bisa diulang.
 drop policy if exists "profiles: user can read own row" on public.tb_pengguna;
 drop policy if exists "profiles: user can insert own row" on public.tb_pengguna;
 drop policy if exists "profiles: admin can read all" on public.tb_pengguna;
@@ -283,9 +237,6 @@ create policy "tb_pengguna: baca baris sendiri"
   on public.tb_pengguna for select
   using (auth.uid() = id);
 
--- Saat registrasi, user hanya boleh membuat baris dirinya sendiri dengan nilai
--- awal yang wajar: mahasiswa harus 'pending', dan tidak ada yang boleh
--- mendaftar dengan has_voted = true.
 create policy "tb_pengguna: daftar akun sendiri"
   on public.tb_pengguna for insert
   with check (
@@ -333,8 +284,6 @@ create policy "tb_kandidat: admin ubah"
   using ( public.is_admin() )
   with check ( public.is_admin() );
 
--- Kandidat yang sudah menerima suara tidak bisa dihapus: tb_suara.kandidat_id
--- memakai foreign key tanpa cascade, jadi database menolaknya otomatis.
 create policy "tb_kandidat: admin hapus"
   on public.tb_kandidat for delete
   using ( public.is_admin() );
@@ -365,8 +314,6 @@ create policy "tb_log_admin: admin tambah"
 -- ---------------------------------------------------------
 -- 4. STORAGE: FOTO KANDIDAT
 -- ---------------------------------------------------------
--- Bucket publik (foto kandidat memang ditampilkan ke semua pemilih), dibatasi
--- 2 MB per file dan hanya JPG/PNG/WEBP. Hanya admin yang boleh upload/hapus.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'foto-kandidat', 'foto-kandidat', true, 2097152,
@@ -381,8 +328,7 @@ drop policy if exists "foto_kandidat: publik baca" on storage.objects;
 drop policy if exists "foto_kandidat: admin upload" on storage.objects;
 drop policy if exists "foto_kandidat: admin hapus" on storage.objects;
 
--- Policy baca juga dibutuhkan agar admin bisa menghapus file (DELETE ... WHERE
--- ikut memeriksa policy SELECT).
+
 create policy "foto_kandidat: publik baca"
   on storage.objects for select
   using ( bucket_id = 'foto-kandidat' );
