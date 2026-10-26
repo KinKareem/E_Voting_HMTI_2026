@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sesi Voting — Panel Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+
+<body>
+  <div class="admin-layout">
+    <div id="sidebar-root"></div>
+
+    <main class="dashboard-main">
+      <div class="dashboard-inner">
+        <header class="page-header">
+          <div>
+            <p class="page-eyebrow">Panel Admin</p>
+            <h1 class="page-title">Sesi Voting</h1>
+            <p class="page-subtitle">
+              Buka dan tutup sesi pemilihan. Setiap perubahan dan setiap suara dicatat permanen di
+              blockchain.
+            </p>
+          </div>
+        </header>
+
+        <div id="config-alert" class="status-msg error hidden"></div>
+
+        <div class="session-layout">
+          <!-- Status & aksi -->
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">Status Sesi</h2>
+              <button type="button" class="btn-outline" id="refresh-btn">Muat ulang</button>
+            </div>
+
+            <span class="session-badge" id="session-badge" data-state="loading">Memuat...</span>
+
+            <dl class="detail-list">
+              <div>
+                <dt>Dibuka</dt>
+                <dd id="opened-info">&mdash;</dd>
+              </div>
+              <div>
+                <dt>Ditutup</dt>
+                <dd id="closed-info">&mdash;</dd>
+              </div>
+              <div>
+                <dt>Pemilik kontrak</dt>
+                <dd id="owner-info" class="mono">&mdash;</dd>
+              </div>
+              <div>
+                <dt>Alamat kontrak</dt>
+                <dd id="contract-info" class="mono">&mdash;</dd>
+              </div>
+              <div>
+                <dt>Jaringan</dt>
+                <dd id="network-info">&mdash;</dd>
+              </div>
+              <div>
+                <dt>Salinan database</dt>
+                <dd id="db-info">&mdash;</dd>
+              </div>
+            </dl>
+
+            <div class="session-actions">
+              <button type="button" class="btn-primary" id="btn-open" disabled>
+                Mulai Sesi Voting
+              </button>
+              <button type="button" class="btn-danger-fill" id="btn-close" disabled>
+                Tutup Sesi Voting
+              </button>
+              <button type="button" class="btn-outline hidden" id="btn-cancel-close">
+                Batalkan penutupan
+              </button>
+            </div>
+            <p class="session-hint" id="action-hint"></p>
+          </section>
+
+          <!-- Wallet -->
+          <section class="panel">
+            <h2 class="panel-title">Wallet Admin</h2>
+
+            <p class="wallet-address" id="wallet-address">Belum terhubung</p>
+            <div class="wallet-chips" id="wallet-chips"></div>
+
+            <div class="wallet-actions">
+              <button type="button" class="btn-primary" id="btn-connect">Hubungkan MetaMask</button>
+              <button type="button" class="btn-outline hidden" id="btn-switch">
+                Ganti jaringan
+              </button>
+            </div>
+
+            <p class="panel-note" id="wallet-help">
+              Membuka/menutup sesi hanya bisa dilakukan wallet yang dipakai saat mendeploy kontrak.
+              Biaya transaksi (gas) dibayar dari wallet ini.
+            </p>
+          </section>
+        </div>
+
+        <!-- Relayer & antrian suara -->
+        <section class="panel panel-wide">
+          <h2 class="panel-title">Relayer dan Antrian Suara</h2>
+          <p class="panel-note panel-note-top">
+            Suara mahasiswa masuk antrian tanpa identitas, lalu dikirim relayer ke blockchain dalam
+            batch berurutan acak.
+          </p>
+
+          <dl class="detail-list">
+            <div>
+              <dt>Relayer terdaftar</dt>
+              <dd id="relayer-chain" class="mono">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Relayer berjalan</dt>
+              <dd id="relayer-live" data-state="idle">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Antrian suara</dt>
+              <dd id="queue-info">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Suara di blockchain</dt>
+              <dd id="chain-votes">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Mahasiswa sudah memilih</dt>
+              <dd id="voted-info">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Pemeriksaan konsistensi</dt>
+              <dd id="verify-info" data-state="idle">&mdash;</dd>
+            </div>
+          </dl>
+
+          <div class="relayer-form">
+            <label for="relayer-input" class="relayer-label">Ganti relayer</label>
+            <div class="relayer-row">
+              <input type="text" id="relayer-input" placeholder="0x... (alamat wallet relayer baru)" autocomplete="off"
+                spellcheck="false" />
+              <button type="button" class="btn-outline" id="btn-set-relayer" disabled>
+                Daftarkan relayer
+              </button>
+            </div>
+            <p class="panel-note" id="relayer-hint">
+              Gunakan jika wallet relayer lama hilang atau rusak. Hanya wallet pemilik kontrak yang
+              bisa mengganti relayer.
+            </p>
+          </div>
+        </section>
+
+        <!-- Hasil akhir (tampil setelah sesi ditutup) -->
+        <section class="panel panel-wide hidden" id="results-panel">
+          <h2 class="panel-title">Hasil Akhir</h2>
+          <div class="table-card">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Paslon</th>
+                  <th>Ketua &amp; Wakil</th>
+                  <th>Suara</th>
+                  <th>Persentase</th>
+                </tr>
+              </thead>
+              <tbody id="results-body"></tbody>
+            </table>
+          </div>
+          <p class="panel-note" id="results-note"></p>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Popup konfirmasi + progres transaksi -->
+  <div class="modal-overlay hidden" id="tx-overlay">
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="tx-title" aria-describedby="tx-text"
+      id="tx-modal">
+      <!-- Tampilan 1: konfirmasi -->
+      <div id="tx-view-confirm">
+        <h2 class="modal-title" id="tx-title"></h2>
+        <p class="modal-text" id="tx-text"></p>
+        <ul class="modal-list" id="tx-points"></ul>
+        <p class="modal-warning" id="tx-warning"></p>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" id="tx-cancel">Batal</button>
+          <button type="button" class="btn-primary" id="tx-confirm"></button>
+        </div>
+      </div>
+
+      <!-- Tampilan 2: progres (langkah diisi oleh Sesivoting.js sesuai aksi) -->
+      <div id="tx-view-progress" class="hidden">
+        <h2 class="modal-title" id="tx-progress-title">Memproses</h2>
+
+        <ol class="progress-steps" id="tx-steps"></ol>
+
+        <p class="modal-text hidden" id="tx-note"></p>
+        <div id="tx-result" class="status-msg hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-outline hidden" id="tx-abort">Batalkan penutupan</button>
+          <button type="button" class="btn-primary hidden" id="tx-close">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script src="../js/Supabaseclient.js"></script>
+  <script src="../js/Blockchainconfig.js"></script>
+  <script src="../js/Blockchain.js"></script>
+  <script src="../js/Sidebar.js"></script>
+  <script src="../js/Sesivoting.js"></script>
+</body>
+
+</html>

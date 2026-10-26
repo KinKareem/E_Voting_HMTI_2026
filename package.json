@@ -1,0 +1,21 @@
+{
+  "name": "evoting-hmti-relayer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Relayer E-Voting HMTI: mengirim antrian suara anonim dari database ke smart contract",
+  "main": "relayer.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node relayer.js",
+    "sekali": "node relayer.js --sekali",
+    "paksa": "node relayer.js --sekali --paksa",
+    "buat-wallet": "node buat-wallet.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5",
+    "ethers": "6.13.4"
+  }
+}

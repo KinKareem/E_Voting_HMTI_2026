@@ -1,8 +1,21 @@
 /* =========================================================
    Kandidat.js
-   Logic untuk admin/kandidat.html
+   Logic untuk admin/kandidat.html:
+   - menampilkan card kandidat dari tabel tb_kandidat
+   - form tambah & edit kandidat (termasuk upload foto)
+   - hapus kandidat dengan popup konfirmasi
+   - notifikasi hasil tindakan lewat showToast() (ada di bagian atas file ini)
+
+   Foto disimpan di Supabase Storage (bucket "foto-kandidat"),
+   sedangkan lokasi filenya dicatat di kolom tb_kandidat.foto_path.
    ========================================================= */
 
+// =========================================================
+// NOTIFIKASI (TOAST) — slide masuk dari kanan bawah layar.
+// Ditulis langsung di halaman ini, tidak bergantung pada file lain.
+// Pemakaian: showToast("success" | "error" | "info", "pesan");
+// Tampilannya diatur di css/style.css (bagian TOAST).
+// =========================================================
 function showToast(type, message) {
   let box = document.getElementById("toast-container");
   if (!box) {
@@ -23,7 +36,7 @@ function showToast(type, message) {
 
   const text = document.createElement("p");
   text.className = "toast-message";
-  text.textContent = message;
+  text.textContent = message; // textContent: aman dari HTML injection
 
   const close = document.createElement("button");
   close.type = "button";
@@ -33,8 +46,9 @@ function showToast(type, message) {
 
   toast.append(icon, text, close);
   box.appendChild(toast);
-  while (box.children.length > 4) box.firstElementChild.remove();
+  while (box.children.length > 4) box.firstElementChild.remove(); // maksimal 4 sekaligus
 
+  // Hilang otomatis; berhenti dihitung saat kursor di atas toast supaya sempat dibaca
   const dismiss = () => {
     toast.classList.remove("toast-show");
     setTimeout(() => toast.remove(), 450);
@@ -49,6 +63,7 @@ function showToast(type, message) {
     dismiss();
   });
 
+  // Class "toast-show" ditambahkan di frame berikutnya agar transisi slide berjalan
   requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add("toast-show")));
 }
 
@@ -78,17 +93,35 @@ const deleteCancelBtn = document.getElementById("delete-cancel");
 const deleteConfirmBtn = document.getElementById("delete-confirm");
 
 let kandidatList = [];
-let editingKandidat = null;
-let selectedFile = null;
-let removeExistingFoto = false;
+let locked = false; // true jika sesi voting sudah dibuka: data kandidat dikunci
+const lockNoteEl = document.getElementById("lock-note");
+let editingKandidat = null; // null = mode tambah
+let selectedFile = null; // foto baru yang dipilih di form
+let removeExistingFoto = false; // admin menekan "Hapus foto" saat edit
 let previewObjectUrl = null;
 let deleteTarget = null;
 let isSaving = false;
 let isDeleting = false;
 let lastFocusedEl = null;
 
+// ---------------------------------------------------------
 // Memuat & menampilkan daftar kandidat
+// ---------------------------------------------------------
+// Data kandidat dikunci begitu sesi dibuka, karena nomor paslon sudah didaftarkan permanen di
+// kontrak blockchain saat itu. (Dijaga juga oleh trigger di database; ini untuk tampilan.)
+async function loadLock() {
+  const { data, error } = await sb.from("tb_sesi_voting").select("status").eq("id", 1).single();
+  locked = !error && !!data && data.status !== "belum_mulai";
+  lockNoteEl.textContent = locked
+    ? "Sesi voting sudah dibuka, jadi data kandidat dikunci dan tidak dapat ditambah, diubah, atau dihapus. Nomor paslon sudah didaftarkan permanen di blockchain."
+    : "";
+  lockNoteEl.classList.toggle("hidden", !locked);
+  openBtn.disabled = locked;
+}
+
 async function loadKandidat() {
+  await loadLock();
+
   const { data, error } = await sb
     .from("tb_kandidat")
     .select("*")
@@ -172,17 +205,21 @@ function kandidatCardHtml(k) {
         </div>
         ${catatan}
 
-        <div class="card-actions">
+        ${locked
+      ? ""
+      : `<div class="card-actions">
           <button type="button" class="btn-outline btn-edit" data-id="${k.id}">Edit</button>
           <button type="button" class="btn-danger btn-delete" data-id="${k.id}">Hapus</button>
-        </div>
+        </div>`
+    }
       </div>
     </article>
   `;
 }
 
-// listener untuk semua tombol Edit/Hapus di card
+// Satu listener untuk semua tombol Edit/Hapus di card (event delegation)
 gridEl.addEventListener("click", (e) => {
+  if (locked) return;
   const editBtn = e.target.closest(".btn-edit");
   const deleteBtn = e.target.closest(".btn-delete");
   if (editBtn) {
@@ -194,7 +231,9 @@ gridEl.addEventListener("click", (e) => {
   }
 });
 
+// ---------------------------------------------------------
 // Form tambah / edit
+// ---------------------------------------------------------
 function openForm(kandidat, triggerEl) {
   editingKandidat = kandidat || null;
   lastFocusedEl = triggerEl || openBtn;
@@ -234,7 +273,9 @@ function closeForm() {
   if (lastFocusedEl) lastFocusedEl.focus();
 }
 
-openBtn.addEventListener("click", () => openForm(null, openBtn));
+openBtn.addEventListener("click", () => {
+  if (!locked) openForm(null, openBtn);
+});
 cancelBtn.addEventListener("click", closeForm);
 overlayEl.addEventListener("click", (e) => {
   if (e.target === overlayEl) closeForm();
@@ -286,7 +327,7 @@ function releasePreviewUrl() {
   }
 }
 
-
+// Menampilkan foto baru (jika dipilih), foto lama (saat edit), atau placeholder
 function refreshFotoPreview() {
   releasePreviewUrl();
 
@@ -360,13 +401,15 @@ formEl.addEventListener("submit", async (e) => {
       payload.foto_path = null;
     }
 
-    // 2) Simpan data kandidat ke Supabase
+    // 2) Simpan data. .select() dipakai untuk memastikan baris benar-benar tersimpan
+    //    (jika izin database menolak, Supabase tidak melempar error, hanya 0 baris).
     const query = isEdit
       ? sb.from("tb_kandidat").update(payload).eq("id", editingKandidat.id).select()
       : sb.from("tb_kandidat").insert(payload).select();
     const { data, error } = await query;
 
     if (error) {
+      // 23505 = unique_violation (nomor paslon sudah dipakai)
       throw new Error(
         error.code === "23505" ? `Nomor paslon ${nomor} sudah dipakai kandidat lain.` : error.message
       );
@@ -375,6 +418,7 @@ formEl.addEventListener("submit", async (e) => {
       throw new Error("Perubahan tidak tersimpan. Pastikan Anda login sebagai admin.");
     }
 
+    // 3) Berhasil: bersihkan foto lama yang sudah tidak dipakai
     if (oldPath && oldPath !== payload.foto_path) await removeFotoFile(oldPath);
 
     isSaving = false;
@@ -387,7 +431,7 @@ formEl.addEventListener("submit", async (e) => {
     );
     await loadKandidat();
   } catch (err) {
-
+    // Gagal setelah foto terlanjur terunggah: hapus agar tidak jadi file yatim
     if (uploadedPath) await removeFotoFile(uploadedPath);
     showFormError(err.message);
   } finally {
@@ -398,7 +442,9 @@ formEl.addEventListener("submit", async (e) => {
   }
 });
 
+// ---------------------------------------------------------
 // Hapus kandidat
+// ---------------------------------------------------------
 function openDelete(kandidat, triggerEl) {
   deleteTarget = kandidat;
   lastFocusedEl = triggerEl;
@@ -412,7 +458,7 @@ function openDelete(kandidat, triggerEl) {
   deleteConfirmBtn.textContent = "Ya, Hapus";
 
   deleteOverlayEl.classList.remove("hidden");
-  deleteCancelBtn.focus();
+  deleteCancelBtn.focus(); // fokus awal di aksi yang aman
 }
 
 function closeDelete() {
@@ -445,6 +491,7 @@ deleteConfirmBtn.addEventListener("click", async () => {
   if (error || !data || data.length === 0) {
     let message = "Kandidat tidak terhapus. Pastikan Anda login sebagai admin.";
     if (error) {
+      // 23503 = foreign_key_violation (kandidat sudah punya suara di tb_suara)
       message =
         error.code === "23503"
           ? "Kandidat ini sudah menerima suara sehingga tidak dapat dihapus."
@@ -475,6 +522,7 @@ document.addEventListener("keydown", (e) => {
 // Helper
 // ---------------------------------------------------------
 // Menghapus file foto di Storage. Kegagalan tidak menggagalkan proses utama
+// (paling buruk tersisa file yatim), jadi hanya dicatat di console.
 async function removeFotoFile(path) {
   try {
     const { error } = await sb.storage.from(BUCKET).remove([path]);
@@ -513,6 +561,7 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Untuk nilai di dalam atribut HTML (escapeHtml tidak meng-escape tanda kutip)
 function escapeAttr(str) {
   return escapeHtml(str).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

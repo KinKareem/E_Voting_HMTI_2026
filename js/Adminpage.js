@@ -27,7 +27,6 @@ function hideStatus(elementId) {
   const el = document.getElementById(elementId);
   el.className = "status-msg hidden";
 }
-s
 if (new URLSearchParams(window.location.search).get("sesi") === "habis") {
   showStatus(
     "login-status",

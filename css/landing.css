@@ -610,3 +610,114 @@ html {
   background: #fef2f2;
   color: #b91c1c;
 }
+
+/* Pemeriksaan jumlah suara (transparansi) */
+.verify-list {
+  max-width: 460px;
+  margin: 16px 0 0;
+}
+
+.verify-list>div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-top: 1px solid rgba(62, 39, 35, 0.1);
+  font-size: 13px;
+}
+
+.verify-list dt {
+  color: var(--bark-700);
+}
+
+.verify-list dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--bark-900);
+}
+
+.verify-list+.chain-note {
+  margin-top: 12px;
+}
+
+/* Hasil akhir (tampil setelah sesi ditutup) */
+.section-hasil {
+  background: #fff;
+  border-top: 1px solid var(--border-soft);
+}
+
+.hasil-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 20px;
+}
+
+.hasil-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 24px;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  background: var(--ivory);
+}
+
+.hasil-card.unggul {
+  border-color: var(--gold-500);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.25);
+}
+
+.hasil-nomor {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bark-900);
+  color: var(--gold-400);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.hasil-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hasil-nama {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--bark-900);
+  overflow-wrap: anywhere;
+}
+
+.hasil-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(62, 39, 35, 0.1);
+  overflow: hidden;
+}
+
+.hasil-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--bark-700), var(--gold-500));
+}
+
+.hasil-angka {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--bark-800);
+}
+
+.hasil-total {
+  margin: 20px 0 0;
+  font-size: 14px;
+  color: var(--bark-700);
+}

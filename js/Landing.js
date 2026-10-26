@@ -30,6 +30,10 @@ let lastFocusedEl = null;
 let lastLogSignature = null;
 let sesiStatus = null; // "belum_mulai" | "berlangsung" | "selesai" | null (tidak diketahui)
 let chainStatusKey = null; // status sesi menurut blockchain (null jika belum terbaca)
+let chainState = null; // keadaan lengkap dari blockchain (null jika belum terbaca)
+let ringkasanSebelum = null; // ringkasan jumlah suara dibaca SEBELUM membaca blockchain
+let ringkasanSesudah = null; // ... dan SESUDAH membaca blockchain
+let hasilTampil = false; // hasil akhir sudah digambar
 let kandidatAnimated = false;
 let logAnimated = false;
 
@@ -45,6 +49,14 @@ const el = {
   sessionText: document.getElementById("session-text"),
   sessionNotice: document.getElementById("session-notice"),
   chainNote: document.getElementById("chain-note"),
+  verifyList: document.getElementById("verify-list"),
+  verifyChain: document.getElementById("v-chain"),
+  verifyVoted: document.getElementById("v-voted"),
+  verifyQueue: document.getElementById("v-queue"),
+  verifyNote: document.getElementById("verify-note"),
+  hasilSection: document.getElementById("hasil"),
+  hasilGrid: document.getElementById("hasil-grid"),
+  hasilTotal: document.getElementById("hasil-total"),
   kandidatGrid: document.getElementById("kandidat-grid"),
   kandidatError: document.getElementById("kandidat-error"),
   logList: document.getElementById("log-list"),
@@ -100,19 +112,18 @@ async function init() {
 
   profile = me;
   renderUser();
-  updateVoteState();
   playIntroAnimation();
 
-  await Promise.all([loadKandidat(), loadSesi(), loadLog()]);
-  updateChainNote();
+  await loadSesi(); // status sesi dulu, agar tombol kandidat langsung benar saat digambar
+  await loadKandidat();
+  await refreshTransparansi();
   revealSectionHeads();
   if (hasScrollTrigger) ScrollTrigger.refresh();
 
   // Segarkan status sesi & riwayat secara berkala (admin bisa membuka/menutup sesi kapan saja)
   setInterval(async () => {
     if (document.hidden) return;
-    await Promise.all([loadSesi(), loadLog()]);
-    updateChainNote();
+    await Promise.all([loadSesi(), refreshTransparansi()]);
   }, LOG_REFRESH_MS);
 }
 
@@ -144,6 +155,12 @@ const SESI_INFO = {
     notice: "Sesi voting belum dibuka. Anda dapat mempelajari profil kandidat; tombol pilih akan aktif saat panitia membuka sesi.",
   },
   berlangsung: { chip: "Sesi voting: sedang berlangsung", dot: "open", button: null, notice: null },
+  menutup: {
+    chip: "Sesi voting: sedang ditutup",
+    dot: "ended",
+    button: "Sesi sedang ditutup",
+    notice: "Sesi voting sedang ditutup oleh panitia. Suara yang sudah masuk sedang dikirim ke blockchain.",
+  },
   selesai: {
     chip: "Sesi voting: telah ditutup",
     dot: "ended",
@@ -191,6 +208,7 @@ async function loadSesi() {
   const { data, error } = await sb.from("tb_sesi_voting").select("*").eq("id", 1).single();
   sesiStatus = error || !data ? null : data.status;
   updateVoteState();
+  updateChainNote();
 }
 
 // =========================================================
@@ -452,6 +470,7 @@ async function loadLog() {
   if (problem) {
     lastLogSignature = "tidak-dikonfigurasi";
     chainStatusKey = null;
+    chainState = null;
     renderLogMessage(
       blockchainConfigCode() === "no_address"
         ? "Kontrak blockchain belum dikonfigurasi oleh panitia."
@@ -465,12 +484,14 @@ async function loadLog() {
     state = await readSessionState(getSessionContract());
   } catch (e) {
     chainStatusKey = null;
+    chainState = null;
     if (lastLogSignature === null) {
       renderLogMessage("Riwayat belum dapat dimuat dari blockchain. Coba muat ulang halaman.");
     }
     return;
   }
   chainStatusKey = state.statusKey;
+  chainState = state;
 
   // Entri terbaru di atas
   const entries = [];
@@ -509,6 +530,108 @@ async function loadLog() {
   }
 }
 
+// Ringkasan jumlah (tanpa identitas apa pun) dari database.
+async function fetchRingkasan() {
+  const { data, error } = await sb.rpc("fn_ringkasan_suara");
+  if (error || !data) return null;
+  return {
+    sudahMemilih: Number(data.sudah_memilih),
+    menunggu: Number(data.menunggu),
+    diproses: Number(data.diproses),
+  };
+}
+
+// Urutan pembacaan: ringkasan -> blockchain -> ringkasan. Pemeriksaan konsistensi memakai
+// ringkasan "sebelum" untuk batas bawah dan "sesudah" untuk batas atas, sehingga suara yang
+// masuk/terkirim di tengah pembacaan tidak menimbulkan peringatan palsu.
+async function refreshTransparansi() {
+  ringkasanSebelum = await fetchRingkasan();
+  await loadLog();
+  ringkasanSesudah = await fetchRingkasan();
+  updateChainNote();
+  updateVerify();
+  await loadHasil();
+}
+
+// Setiap suara di blockchain berasal dari satu mahasiswa yang tercatat memilih:
+//   sudahMemilih(sebelum) - antrian(sebelum) <= suara di blockchain <= sudahMemilih(sesudah)
+function updateVerify() {
+  if (!chainState || !ringkasanSebelum || !ringkasanSesudah) {
+    el.verifyList.classList.add("hidden");
+    el.verifyNote.className = "chain-note hidden";
+    return;
+  }
+
+  const x = chainState.totalVotes;
+  const antrian = ringkasanSesudah.menunggu + ringkasanSesudah.diproses;
+  el.verifyList.classList.remove("hidden");
+  el.verifyChain.textContent = String(x);
+  el.verifyVoted.textContent = String(ringkasanSesudah.sudahMemilih);
+  el.verifyQueue.textContent = String(antrian);
+
+  const batasBawah =
+    ringkasanSebelum.sudahMemilih - (ringkasanSebelum.menunggu + ringkasanSebelum.diproses);
+  const konsisten = x >= batasBawah && x <= ringkasanSesudah.sudahMemilih;
+
+  if (konsisten) {
+    el.verifyNote.className = "chain-note ok";
+    el.verifyNote.textContent =
+      "Jumlah suara konsisten: setiap suara di blockchain berasal dari satu mahasiswa yang tercatat memilih.";
+  } else {
+    el.verifyNote.className = "chain-note warn";
+    el.verifyNote.textContent =
+      "Peringatan: jumlah suara di blockchain tidak sesuai dengan jumlah mahasiswa yang memilih. Hubungi panitia.";
+  }
+}
+
+// Hasil akhir: dibaca dari kontrak setelah sesi ditutup, nama paslon dari database.
+async function loadHasil() {
+  if (!chainState || chainState.status !== 2) {
+    el.hasilSection.classList.add("hidden");
+    return;
+  }
+
+  let hasil;
+  try {
+    hasil = await readResults(getSessionContract());
+  } catch (e) {
+    return; // coba lagi pada pembaruan berikutnya
+  }
+
+  const total = hasil.counts.reduce((a, b) => a + b, 0);
+  const tertinggi = Math.max(...hasil.counts);
+  const adaPemenang = tertinggi > 0 && hasil.counts.filter((c) => c === tertinggi).length === 1;
+
+  el.hasilGrid.innerHTML = hasil.numbers
+    .map((nomor, i) => {
+      const k = kandidatList.find((x) => x.nomor_paslon === nomor);
+      const jumlah = hasil.counts[i];
+      const persen = total > 0 ? (jumlah / total) * 100 : 0;
+      const unggul = adaPemenang && jumlah === tertinggi;
+      return `
+        <article class="hasil-card ${unggul ? "unggul" : ""}">
+          <div class="hasil-nomor">${formatNomor(nomor)}</div>
+          <div class="hasil-info">
+            <p class="hasil-nama">${k ? escapeHtml(k.nama_ketua) + " &amp; " + escapeHtml(k.nama_wakil) : "Paslon " + formatNomor(nomor)}</p>
+            <div class="hasil-bar" aria-hidden="true"><span style="width:${persen.toFixed(1)}%"></span></div>
+            <p class="hasil-angka"><strong>${jumlah}</strong> suara &middot; ${persen.toFixed(1)}%${unggul ? " &middot; suara terbanyak" : ""}</p>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  el.hasilTotal.textContent =
+    `Total ${total} suara tercatat di blockchain.` +
+    (!adaPemenang && total > 0 ? " Perolehan tertinggi sama (seri)." : "");
+  el.hasilSection.classList.remove("hidden");
+
+  if (!hasilTampil) {
+    hasilTampil = true;
+    if (hasScrollTrigger) ScrollTrigger.refresh();
+  }
+}
+
 // Membandingkan status sesi di database aplikasi dengan blockchain.
 // Jika berbeda, pemilih diberi tahu (tanda kemungkinan data tidak konsisten).
 function updateChainNote() {
@@ -516,7 +639,10 @@ function updateChainNote() {
     el.chainNote.className = "chain-note hidden";
     return;
   }
-  if (chainStatusKey === sesiStatus) {
+  // 'menutup' hanya ada di database (tahap peralihan); blockchain masih 'berlangsung'
+  const selaras =
+    chainStatusKey === sesiStatus || (sesiStatus === "menutup" && chainStatusKey === "berlangsung");
+  if (selaras) {
     el.chainNote.className = "chain-note ok";
     el.chainNote.textContent = "Status sesi di aplikasi sesuai dengan catatan di blockchain.";
   } else {
@@ -573,6 +699,8 @@ function revealSectionHeads() {
   document.querySelectorAll("[data-reveal]").forEach((node) => animateOnScroll(node, node));
 }
 
+// Elemen muncul (fade + geser) saat area-nya masuk layar.
+// Memakai fromTo (nilai akhir ditulis eksplisit, tidak dibaca dari CSS) dan clearProps.
 function animateOnScroll(targets, trigger, from = {}) {
   if (!canAnimate) return;
 
@@ -594,7 +722,9 @@ function animateOnScroll(targets, trigger, from = {}) {
   gsap.fromTo(targets, fromVars, toVars);
 }
 
+// =========================================================
 // HELPER
+// =========================================================
 function formatNomor(n) {
   return String(n).padStart(2, "0");
 }

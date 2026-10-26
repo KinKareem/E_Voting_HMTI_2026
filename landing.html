@@ -92,6 +92,22 @@
       </div>
     </section>
 
+    <!-- ===================== HASIL AKHIR (tampil setelah sesi ditutup) ===================== -->
+    <section class="section section-hasil hidden" id="hasil">
+      <div>
+        <div class="section-head" data-reveal>
+          <p class="section-eyebrow">Hasil Pemilihan</p>
+          <h2 class="section-title">Hasil Akhir Penghitungan Suara</h2>
+          <p class="section-desc">
+            Dihitung langsung oleh smart contract di blockchain dan tidak dapat diubah oleh siapa pun.
+          </p>
+          <div class="gold-rule"></div>
+        </div>
+        <div class="hasil-grid" id="hasil-grid"></div>
+        <p class="hasil-total" id="hasil-total"></p>
+      </div>
+    </section>
+
     <!-- ===================== LOG AKTIVITAS ADMIN ===================== -->
     <section class="section section-log" id="aktivitas">
       <div class="log-layout">
@@ -103,6 +119,22 @@
             blockchain. Riwayat di bawah dibaca langsung dari sana, bukan dari server aplikasi.
           </p>
           <p class="chain-note hidden" id="chain-note" role="status"></p>
+
+          <dl class="verify-list hidden" id="verify-list">
+            <div>
+              <dt>Suara tercatat di blockchain</dt>
+              <dd id="v-chain">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Mahasiswa yang sudah memilih</dt>
+              <dd id="v-voted">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Menunggu dikirim ke blockchain</dt>
+              <dd id="v-queue">&mdash;</dd>
+            </div>
+          </dl>
+          <p class="chain-note hidden" id="verify-note" role="status"></p>
           <div class="gold-rule"></div>
         </div>
 

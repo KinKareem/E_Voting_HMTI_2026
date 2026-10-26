@@ -1,15 +1,19 @@
 /* =========================================================
    Sesivoting.js
-   Logic untuk admin/sesi-voting.html — membuka & menutup sesi
-   voting lewat smart contract VotingSession di blockchain.
+   Logic untuk admin/sesi-voting.html — mengelola sesi voting lewat smart contract
+   VotingSession, memantau relayer & antrian suara, dan menampilkan hasil akhir.
 
    Alur singkat:
-   1. Status sesi DIBACA dari blockchain (RPC publik, tanpa wallet).
+   1. Status sesi, jumlah suara, dan hasil DIBACA dari blockchain (RPC publik, tanpa wallet).
    2. Admin menghubungkan MetaMask (harus wallet pemilik kontrak).
-   3. Klik "Mulai"/"Tutup" -> popup konfirmasi -> simulasi transaksi ->
-      konfirmasi di MetaMask -> tunggu terkonfirmasi di jaringan.
-   4. Setelah terkonfirmasi, salinan status disimpan ke tabel
-      tb_sesi_voting agar server bisa menolak suara di luar sesi.
+   3. MULAI: daftar nomor paslon dari database dikunci ke kontrak saat sesi dibuka.
+   4. TUTUP (bertahap, agar tidak ada suara hilang):
+        a. database berhenti menerima suara baru (status 'menutup')
+        b. relayer mengirim semua sisa antrian ke blockchain (halaman ini menunggu)
+        c. baru sesi ditutup di blockchain lewat MetaMask
+        d. salinan status di database diperbarui ke 'selesai'
+   5. Status sesi disalin ke tabel tb_sesi_voting setelah transaksi terkonfirmasi, supaya
+      server bisa menolak suara di luar sesi (database tidak bisa membaca blockchain).
    ========================================================= */
 
 // =========================================================
@@ -70,58 +74,100 @@ function showToast(type, message) {
 }
 
 // ---------------------------------------------------------
-// Elemen & state
+// Konstanta, elemen & state
 // ---------------------------------------------------------
+const RELAYER_STALE_MS = 90 * 1000; // relayer menulis detak jantung tiap ~20 detik
+const LIVE_REFRESH_MS = 15 * 1000; // pembaruan otomatis ringkasan antrian & relayer
+const QUEUE_POLL_MS = 4000; // saat menunggu antrian kosong ketika menutup sesi
+
+const byId = (id) => document.getElementById(id);
+
 const el = {
-  configAlert: document.getElementById("config-alert"),
-  badge: document.getElementById("session-badge"),
-  openedInfo: document.getElementById("opened-info"),
-  closedInfo: document.getElementById("closed-info"),
-  ownerInfo: document.getElementById("owner-info"),
-  contractInfo: document.getElementById("contract-info"),
-  networkInfo: document.getElementById("network-info"),
-  dbInfo: document.getElementById("db-info"),
-  btnOpen: document.getElementById("btn-open"),
-  btnClose: document.getElementById("btn-close"),
-  hint: document.getElementById("action-hint"),
-  refreshBtn: document.getElementById("refresh-btn"),
-  walletAddress: document.getElementById("wallet-address"),
-  walletChips: document.getElementById("wallet-chips"),
-  walletHelp: document.getElementById("wallet-help"),
-  btnConnect: document.getElementById("btn-connect"),
-  btnSwitch: document.getElementById("btn-switch"),
-  overlay: document.getElementById("tx-overlay"),
-  modal: document.getElementById("tx-modal"),
-  viewConfirm: document.getElementById("tx-view-confirm"),
-  viewProgress: document.getElementById("tx-view-progress"),
-  title: document.getElementById("tx-title"),
-  text: document.getElementById("tx-text"),
-  points: document.getElementById("tx-points"),
-  warning: document.getElementById("tx-warning"),
-  btnCancel: document.getElementById("tx-cancel"),
-  btnConfirm: document.getElementById("tx-confirm"),
-  progressTitle: document.getElementById("tx-progress-title"),
-  steps: document.getElementById("tx-steps"),
-  result: document.getElementById("tx-result"),
-  btnClose2: document.getElementById("tx-close"),
+  configAlert: byId("config-alert"),
+  badge: byId("session-badge"),
+  openedInfo: byId("opened-info"),
+  closedInfo: byId("closed-info"),
+  ownerInfo: byId("owner-info"),
+  contractInfo: byId("contract-info"),
+  networkInfo: byId("network-info"),
+  dbInfo: byId("db-info"),
+  btnOpen: byId("btn-open"),
+  btnClose: byId("btn-close"),
+  btnCancelClose: byId("btn-cancel-close"),
+  hint: byId("action-hint"),
+  refreshBtn: byId("refresh-btn"),
+  walletAddress: byId("wallet-address"),
+  walletChips: byId("wallet-chips"),
+  walletHelp: byId("wallet-help"),
+  btnConnect: byId("btn-connect"),
+  btnSwitch: byId("btn-switch"),
+  relayerChain: byId("relayer-chain"),
+  relayerLive: byId("relayer-live"),
+  queueInfo: byId("queue-info"),
+  chainVotes: byId("chain-votes"),
+  votedInfo: byId("voted-info"),
+  verifyInfo: byId("verify-info"),
+  relayerInput: byId("relayer-input"),
+  btnSetRelayer: byId("btn-set-relayer"),
+  relayerHint: byId("relayer-hint"),
+  resultsPanel: byId("results-panel"),
+  resultsBody: byId("results-body"),
+  resultsNote: byId("results-note"),
+  overlay: byId("tx-overlay"),
+  modal: byId("tx-modal"),
+  viewConfirm: byId("tx-view-confirm"),
+  viewProgress: byId("tx-view-progress"),
+  title: byId("tx-title"),
+  text: byId("tx-text"),
+  points: byId("tx-points"),
+  warning: byId("tx-warning"),
+  btnCancel: byId("tx-cancel"),
+  btnConfirm: byId("tx-confirm"),
+  progressTitle: byId("tx-progress-title"),
+  steps: byId("tx-steps"),
+  note: byId("tx-note"),
+  result: byId("tx-result"),
+  btnAbort: byId("tx-abort"),
+  btnClose2: byId("tx-close"),
 };
 
 let chainState = null; // keadaan sesi dari blockchain
 let chainError = null;
+let chainResults = null; // { numbers, counts } (hanya dibaca setelah sesi ditutup)
 let dbState = null; // baris tb_sesi_voting
 let dbError = null;
 let syncError = null;
+let kandidatDb = null; // daftar kandidat dari database (null = gagal dibaca)
+let relayerRow = null; // baris tb_status_relayer (detak jantung relayer)
+let summaryBefore = null; // ringkasan antrian SEBELUM membaca blockchain
+let summaryAfter = null; // ringkasan antrian SESUDAH membaca blockchain
 let wallet = null; // { provider, address, chainId }
-let busy = false; // true selama transaksi diproses
-let pendingAction = null; // "open" | "close"
+let busy = false; // true selama aksi diproses
+let pendingAction = null; // "open" | "close" | "relayer"
+let pendingNumbers = []; // nomor paslon yang akan dikunci saat membuka sesi
+let pendingRelayerAddress = null;
 let currentStep = null;
+let abortRequested = false;
 let lastFocusedEl = null;
 let walletListenersAttached = false;
 
 const STATUS_LABEL = { 0: "Belum dimulai", 1: "Sedang berlangsung", 2: "Telah ditutup" };
-const DB_LABEL = { belum_mulai: "Belum dimulai", berlangsung: "Sedang berlangsung", selesai: "Telah ditutup" };
+const DB_LABEL = {
+  belum_mulai: "Belum dimulai",
+  berlangsung: "Sedang berlangsung",
+  menutup: "Sedang ditutup (menunggu antrian suara kosong)",
+  selesai: "Telah ditutup",
+};
 
-const TX_TEXT = {
+const STEP_LABEL = {
+  stop: "Menghentikan penerimaan suara baru",
+  flush: "Mengirim sisa suara ke blockchain",
+  wallet: "Konfirmasi di MetaMask",
+  chain: "Menunggu konfirmasi jaringan blockchain",
+  db: "Memperbarui database",
+};
+
+const ACTIONS = {
   open: {
     title: "Mulai Sesi Voting?",
     text: "Anda akan membuka sesi pemilihan Ketua HMTI di blockchain.",
@@ -135,26 +181,51 @@ const TX_TEXT = {
     confirmLabel: "Ya, Mulai Sesi",
     confirmClass: "btn-primary",
     progressTitle: "Membuka sesi voting",
-    expectedStatus: 1,
+    steps: ["wallet", "chain", "db"],
+    confirmState: (s) => s.status === 1,
     success: "Sesi voting berhasil dibuka.",
   },
   close: {
     title: "Tutup Sesi Voting?",
     text: "Anda akan menutup sesi pemilihan Ketua HMTI secara permanen.",
     points: [
-      "Mahasiswa tidak dapat lagi memberikan suara.",
-      "Sesi yang sudah ditutup TIDAK dapat dibuka kembali.",
-      "Penutupan dicatat permanen di blockchain dan tidak bisa dihapus.",
+      "Penerimaan suara baru dihentikan, lalu semua sisa suara di antrian dikirim ke blockchain oleh relayer (relayer harus berjalan).",
+      "Setelah antrian kosong, sesi ditutup di blockchain dan TIDAK dapat dibuka kembali.",
+      "Mahasiswa tidak dapat lagi memberikan suara. Hasil akhir dapat dilihat semua orang.",
     ],
-    warning: "Tindakan ini tidak dapat dibatalkan. Pastikan pemilihan memang sudah selesai.",
+    warning: "Tindakan ini tidak dapat dibatalkan setelah transaksi penutupan dikonfirmasi. Pastikan pemilihan memang sudah selesai.",
     danger: true,
     confirmLabel: "Ya, Tutup Sesi",
     confirmClass: "btn-danger-solid",
     progressTitle: "Menutup sesi voting",
-    expectedStatus: 2,
+    steps: ["stop", "flush", "wallet", "chain", "db"],
+    confirmState: (s) => s.status === 2,
     success: "Sesi voting berhasil ditutup.",
   },
+  relayer: {
+    title: "Ganti Relayer?",
+    text: "",
+    points: [
+      "Hanya alamat ini yang dapat mengirim suara ke blockchain.",
+      "Relayer sebelumnya langsung tidak berlaku lagi.",
+      "Anda perlu mengonfirmasi transaksi di MetaMask dan membayar biaya gas.",
+    ],
+    warning:
+      "Pastikan Anda memegang private key alamat tersebut dan memperbarui file .env relayer. Jika salah alamat, suara tidak bisa terkirim sampai relayer diganti lagi.",
+    danger: false,
+    confirmLabel: "Ya, Ganti Relayer",
+    confirmClass: "btn-primary",
+    progressTitle: "Mengganti relayer",
+    steps: ["wallet", "chain"],
+    confirmState: (s) => sameAddress(s.relayer, pendingRelayerAddress),
+    success: "Relayer berhasil diganti.",
+  },
 };
+
+const DEFAULT_RELAYER_HINT =
+  "Gunakan jika wallet relayer lama hilang atau rusak. Hanya wallet pemilik kontrak yang bisa mengganti relayer.";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ---------------------------------------------------------
 // Inisialisasi & pemuatan data
@@ -174,13 +245,31 @@ async function init() {
 
   await restoreWallet();
   await loadAll();
+
+  // Pembaruan otomatis ringan (ringkasan antrian, detak relayer, status chain)
+  setInterval(async () => {
+    if (busy || document.hidden) return;
+    await loadLive();
+    render();
+  }, LIVE_REFRESH_MS);
 }
 
 async function loadAll() {
   setBadge("loading", "Memuat...");
-  await Promise.all([loadChain(getReadProvider()), loadDb()]);
+  await Promise.all([loadDb(), loadKandidatDb()]);
+  await loadLive();
   await autoSync();
   render();
+}
+
+// Urutan penting untuk pemeriksaan konsistensi: ringkasan database dibaca SEBELUM dan
+// SESUDAH membaca blockchain (lihat verifyConsistency).
+async function loadLive() {
+  summaryBefore = await fetchSummary();
+  await loadChain(getReadProvider());
+  summaryAfter = await fetchSummary();
+  await loadRelayerRow();
+  if (chainState && chainState.status === 2) await loadResults();
 }
 
 async function loadChain(runner) {
@@ -190,6 +279,14 @@ async function loadChain(runner) {
   } catch (e) {
     chainState = null;
     chainError = describeChainError(e).message;
+  }
+}
+
+async function loadResults() {
+  try {
+    chainResults = await readResults(getSessionContract(getReadProvider()));
+  } catch (e) {
+    chainResults = null;
   }
 }
 
@@ -204,12 +301,36 @@ async function loadDb() {
   }
 }
 
+async function loadKandidatDb() {
+  const { data, error } = await sb
+    .from("tb_kandidat")
+    .select("nomor_paslon, nama_ketua, nama_wakil")
+    .order("nomor_paslon", { ascending: true });
+  kandidatDb = error ? null : data || [];
+}
+
+async function loadRelayerRow() {
+  const { data, error } = await sb.from("tb_status_relayer").select("*").eq("id", 1).single();
+  relayerRow = error || !data ? null : data;
+}
+
+// Ringkasan jumlah (tanpa identitas): mahasiswa yang sudah memilih & isi antrian.
+async function fetchSummary() {
+  const { data, error } = await sb.rpc("fn_ringkasan_suara");
+  if (error || !data) return null;
+  return {
+    sudahMemilih: Number(data.sudah_memilih),
+    menunggu: Number(data.menunggu),
+    diproses: Number(data.diproses),
+    terkirim: Number(data.terkirim),
+  };
+}
+
 function needsSync(chain, db) {
-  return (
-    db.status !== chain.statusKey ||
-    (chain.openedAt && !db.dibuka_pada) ||
-    (chain.closedAt && !db.ditutup_pada)
-  );
+  // 'menutup' hanya ada di database (tahap peralihan); blockchain masih 'berlangsung'.
+  const statusSelaras =
+    db.status === chain.statusKey || (db.status === "menutup" && chain.statusKey === "berlangsung");
+  return !statusSelaras || (chain.openedAt && !db.dibuka_pada) || (chain.closedAt && !db.ditutup_pada);
 }
 
 // Salinan di database mengikuti blockchain (bukan sebaliknya).
@@ -245,6 +366,20 @@ async function syncDatabase(state, txHash, action) {
   return data[0];
 }
 
+// Mengubah HANYA status di database (dipakai untuk tahap 'menutup' dan pembatalannya).
+async function setDbStatus(status) {
+  const { data, error } = await sb
+    .from("tb_sesi_voting")
+    .update({ status, diperbarui_pada: new Date().toISOString() })
+    .eq("id", 1)
+    .select();
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) {
+    throw new Error("Database menolak pembaruan. Pastikan Anda login sebagai admin.");
+  }
+  dbState = data[0];
+}
+
 // ---------------------------------------------------------
 // Tampilan
 // ---------------------------------------------------------
@@ -257,9 +392,22 @@ function sameAddress(a, b) {
   return !!a && !!b && a.toLowerCase() === b.toLowerCase();
 }
 
+// Penutupan sudah dimulai di database tetapi transaksi penutupan belum selesai di blockchain
+function closingInProgress() {
+  return !!(dbState && dbState.status === "menutup" && chainState && chainState.status === 1);
+}
+
+function relativeTime(iso) {
+  const detik = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (detik < 60) return `${detik} detik lalu`;
+  if (detik < 3600) return `${Math.round(detik / 60)} menit lalu`;
+  return `${Math.round(detik / 3600)} jam lalu`;
+}
+
 function render() {
   // Badge status
   if (chainError) setBadge("error", "Tidak dapat dibaca");
+  else if (closingInProgress()) setBadge("closing", "Sedang ditutup");
   else if (chainState) setBadge(["idle", "open", "closed"][chainState.status], STATUS_LABEL[chainState.status]);
 
   // Rincian
@@ -284,42 +432,69 @@ function render() {
   renderWallet();
 
   const gate = actionGate();
+  const closing = closingInProgress();
   el.btnOpen.disabled = !(gate.canAct && chainState.status === 0);
   el.btnClose.disabled = !(gate.canAct && chainState.status === 1);
+  el.btnClose.textContent = closing ? "Lanjutkan Penutupan" : "Tutup Sesi Voting";
+  el.btnCancelClose.classList.toggle("hidden", !closing);
+  el.btnCancelClose.disabled = busy;
   el.hint.textContent = gate.hint;
+
+  renderRelayerPanel();
+  renderResults();
+}
+
+// Syarat dasar untuk aksi yang butuh wallet pemilik kontrak
+function walletGate() {
+  if (blockchainConfigProblem()) {
+    return { ok: false, hint: "Selesaikan pengaturan kontrak terlebih dahulu (lihat pesan di atas)." };
+  }
+  if (chainError) {
+    return { ok: false, hint: 'Status sesi belum dapat dibaca dari blockchain. Klik "Muat ulang".' };
+  }
+  if (!chainState) return { ok: false, hint: "Memuat status sesi..." };
+  if (busy) return { ok: false, hint: "Aksi sedang diproses..." };
+  if (!wallet) return { ok: false, hint: "Hubungkan MetaMask untuk mengelola sesi." };
+  if (wallet.chainId !== BLOCKCHAIN.CHAIN_ID) {
+    return { ok: false, hint: `MetaMask berada di jaringan lain. Ganti ke ${BLOCKCHAIN.CHAIN_NAME}.` };
+  }
+  if (!sameAddress(wallet.address, chainState.owner)) {
+    return {
+      ok: false,
+      hint: `Wallet yang terhubung bukan pemilik kontrak. Pilih akun ${shortAddress(chainState.owner)} di MetaMask.`,
+    };
+  }
+  return { ok: true, hint: "" };
 }
 
 function actionGate() {
-  if (blockchainConfigProblem()) {
-    return { canAct: false, hint: "Selesaikan pengaturan kontrak terlebih dahulu (lihat pesan di atas)." };
-  }
-  if (chainError) {
-    return { canAct: false, hint: 'Status sesi belum dapat dibaca dari blockchain. Klik "Muat ulang".' };
-  }
-  if (!chainState) return { canAct: false, hint: "Memuat status sesi..." };
-  if (chainState.status === 2) {
+  if (!blockchainConfigProblem() && !chainError && chainState && chainState.status === 2) {
     return {
       canAct: false,
       hint: "Sesi sudah ditutup secara permanen dan tidak dapat dibuka kembali. Untuk pemilihan baru, deploy kontrak baru.",
     };
   }
-  if (busy) return { canAct: false, hint: "Transaksi sedang diproses..." };
-  if (!wallet) return { canAct: false, hint: "Hubungkan MetaMask untuk membuka atau menutup sesi." };
-  if (wallet.chainId !== BLOCKCHAIN.CHAIN_ID) {
-    return { canAct: false, hint: `MetaMask berada di jaringan lain. Ganti ke ${BLOCKCHAIN.CHAIN_NAME}.` };
+  const gate = walletGate();
+  if (!gate.ok) return { canAct: false, hint: gate.hint };
+
+  if (chainState.status === 0) {
+    if (kandidatDb && kandidatDb.length === 0) {
+      return {
+        canAct: false,
+        hint: "Belum ada kandidat. Tambahkan kandidat di menu Kandidat sebelum memulai sesi.",
+      };
+    }
+    return { canAct: true, hint: 'Sesi belum dimulai. Klik "Mulai Sesi Voting" untuk membuka pemilihan.' };
   }
-  if (!sameAddress(wallet.address, chainState.owner)) {
+  if (closingInProgress()) {
     return {
-      canAct: false,
-      hint: `Wallet yang terhubung bukan pemilik kontrak. Pilih akun ${shortAddress(chainState.owner)} di MetaMask.`,
+      canAct: true,
+      hint: 'Penutupan sedang berlangsung: penerimaan suara sudah dihentikan. Klik "Lanjutkan Penutupan" untuk menyelesaikannya, atau "Batalkan penutupan" untuk membuka kembali.',
     };
   }
   return {
     canAct: true,
-    hint:
-      chainState.status === 0
-        ? 'Sesi belum dimulai. Klik "Mulai Sesi Voting" untuk membuka pemilihan.'
-        : 'Sesi sedang berlangsung. Klik "Tutup Sesi Voting" jika pemilihan sudah selesai.',
+    hint: 'Sesi sedang berlangsung. Klik "Tutup Sesi Voting" jika pemilihan sudah selesai.',
   };
 }
 
@@ -367,6 +542,135 @@ function renderWallet() {
   }
   el.btnSwitch.textContent = `Ganti ke ${BLOCKCHAIN.CHAIN_NAME}`;
   el.btnSwitch.classList.toggle("hidden", rightNetwork);
+}
+
+// Apakah relayer terlihat aktif? -> { state: "ok" | "bad" | "idle", text }
+function relayerHealth() {
+  if (!relayerRow || !relayerRow.terakhir_aktif) {
+    return { state: "bad", text: "Belum pernah berjalan. Jalankan relayer (lihat relayer/PANDUAN_RELAYER.md)." };
+  }
+  const umur = Date.now() - new Date(relayerRow.terakhir_aktif).getTime();
+  const parts = [];
+  let state = "ok";
+
+  if (umur > RELAYER_STALE_MS) {
+    state = "bad";
+    parts.push(`Tidak aktif — terakhir terdeteksi ${relativeTime(relayerRow.terakhir_aktif)}`);
+  } else {
+    parts.push(`Aktif (terdeteksi ${relativeTime(relayerRow.terakhir_aktif)})`);
+  }
+  if (relayerRow.terakhir_kirim) parts.push(`terakhir kirim ${relativeTime(relayerRow.terakhir_kirim)}`);
+  if (relayerRow.alamat_relayer && chainState && !sameAddress(relayerRow.alamat_relayer, chainState.relayer)) {
+    state = "bad";
+    parts.push(`PERINGATAN: wallet yang berjalan (${shortAddress(relayerRow.alamat_relayer)}) berbeda dengan relayer terdaftar`);
+  }
+  if (relayerRow.error_terakhir) {
+    state = "bad";
+    parts.push(`Error: ${relayerRow.error_terakhir}`);
+  }
+  return { state, text: parts.join(" · ") };
+}
+
+// Pemeriksaan: setiap suara di blockchain berasal dari satu mahasiswa yang tercatat memilih.
+//   sudahMemilih(sebelum) - antrian(sebelum) <= suara di blockchain <= sudahMemilih(sesudah)
+// (ringkasan dibaca sebelum dan sesudah blockchain agar perubahan di tengah pembacaan tidak
+// menimbulkan peringatan palsu)
+function verifyConsistency() {
+  if (!chainState || !summaryBefore || !summaryAfter) return null;
+  const x = chainState.totalVotes;
+  const batasBawah = summaryBefore.sudahMemilih - (summaryBefore.menunggu + summaryBefore.diproses);
+  return x >= batasBawah && x <= summaryAfter.sudahMemilih;
+}
+
+function renderRelayerPanel() {
+  el.relayerChain.textContent = chainState ? chainState.relayer : "—";
+
+  const health = relayerHealth();
+  el.relayerLive.textContent = health.text;
+  el.relayerLive.dataset.state = health.state;
+
+  const ringkasan = summaryAfter || summaryBefore;
+  el.queueInfo.textContent = ringkasan
+    ? `${ringkasan.menunggu} menunggu · ${ringkasan.diproses} diproses · ${ringkasan.terkirim} terkirim`
+    : "—";
+  el.chainVotes.textContent = chainState ? String(chainState.totalVotes) : "—";
+  el.votedInfo.textContent = summaryAfter ? String(summaryAfter.sudahMemilih) : "—";
+
+  const konsisten = verifyConsistency();
+  if (konsisten === null) {
+    el.verifyInfo.textContent = "—";
+    el.verifyInfo.dataset.state = "idle";
+  } else if (konsisten) {
+    el.verifyInfo.textContent = "Konsisten: jumlah suara di blockchain sesuai dengan jumlah mahasiswa yang memilih dan isi antrian.";
+    el.verifyInfo.dataset.state = "ok";
+  } else {
+    el.verifyInfo.textContent =
+      "TIDAK KONSISTEN: jumlah suara di blockchain tidak sesuai dengan jumlah mahasiswa yang memilih. Jika ini data uji lama, reset status memilih (lihat PANDUAN_DEPLOY.md); jika bukan, selidiki sebelum menutup sesi.";
+    el.verifyInfo.dataset.state = "bad";
+  }
+
+  renderRelayerForm();
+}
+
+function renderRelayerForm() {
+  const value = el.relayerInput.value.trim();
+  let hint = DEFAULT_RELAYER_HINT;
+  let valid = false;
+
+  if (chainState && chainState.status === 2) {
+    hint = "Sesi sudah ditutup; relayer tidak dapat diganti lagi.";
+  } else {
+    const gate = walletGate();
+    if (!gate.ok) hint = gate.hint;
+    else if (!value) hint = DEFAULT_RELAYER_HINT;
+    else if (!ethers.isAddress(value)) hint = "Alamat tidak valid. Periksa kembali (diawali 0x, 42 karakter).";
+    else if (sameAddress(value, chainState.relayer)) hint = "Alamat ini sudah menjadi relayer terdaftar.";
+    else {
+      valid = true;
+      hint = 'Alamat valid. Klik "Daftarkan relayer" untuk menggantinya (perlu konfirmasi MetaMask).';
+    }
+  }
+  el.relayerHint.textContent = hint;
+  el.btnSetRelayer.disabled = !valid;
+}
+
+// Hasil akhir dibaca dari kontrak; nama paslon dari database
+function renderResults() {
+  const tampil = !!(chainState && chainState.status === 2 && chainResults);
+  el.resultsPanel.classList.toggle("hidden", !tampil);
+  if (!tampil) return;
+
+  const total = chainResults.counts.reduce((a, b) => a + b, 0);
+  const tertinggi = Math.max(...chainResults.counts);
+  const pemenang = chainResults.counts.filter((c) => c === tertinggi).length === 1 && tertinggi > 0;
+
+  el.resultsBody.innerHTML = "";
+  chainResults.numbers.forEach((nomor, i) => {
+    const k = (kandidatDb || []).find((x) => x.nomor_paslon === nomor);
+    const jumlah = chainResults.counts[i];
+    const persen = total > 0 ? ((jumlah / total) * 100).toFixed(1) : "0.0";
+
+    const tr = document.createElement("tr");
+    if (pemenang && jumlah === tertinggi) tr.className = "row-top";
+
+    const cells = [
+      String(nomor).padStart(2, "0"),
+      k ? `${k.nama_ketua} & ${k.nama_wakil}` : "(data kandidat tidak ditemukan)",
+      String(jumlah),
+      `${persen}%`,
+    ];
+    cells.forEach((text, idx) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (idx === 0) td.className = "strong";
+      tr.appendChild(td);
+    });
+    el.resultsBody.appendChild(tr);
+  });
+
+  el.resultsNote.textContent =
+    `Total ${total} suara, dihitung langsung oleh smart contract dan tidak dapat diubah.` +
+    (!pemenang && total > 0 ? " Perolehan tertinggi sama (seri)." : "");
 }
 
 // ---------------------------------------------------------
@@ -460,30 +764,46 @@ async function switchNetwork() {
   await refreshWallet();
 }
 
-el.btnConnect.addEventListener("click", connectWallet);
-el.btnSwitch.addEventListener("click", switchNetwork);
-el.refreshBtn.addEventListener("click", async () => {
-  if (busy) return;
-  if (blockchainConfigProblem()) return;
-  await loadAll();
-  showToast("info", "Status sesi diperbarui dari blockchain.");
-});
-
 // ---------------------------------------------------------
-// Popup konfirmasi & transaksi
+// Popup konfirmasi
 // ---------------------------------------------------------
 function openConfirm(action) {
-  const button = action === "open" ? el.btnOpen : el.btnClose;
+  const button = action === "open" ? el.btnOpen : action === "close" ? el.btnClose : el.btnSetRelayer;
   if (busy || button.disabled) return;
 
-  const cfg = TX_TEXT[action];
+  const cfg = ACTIONS[action];
+  let text = cfg.text;
+  const points = cfg.points.slice();
+
+  if (action === "open") {
+    // Nomor paslon dikunci permanen di kontrak saat sesi dibuka
+    const daftar = kandidatDb || [];
+    if (daftar.length === 0) {
+      showToast("error", "Belum ada kandidat. Tambahkan kandidat di menu Kandidat dulu.");
+      return;
+    }
+    pendingNumbers = daftar.map((k) => k.nomor_paslon);
+    points.unshift(
+      `Kandidat yang akan dikunci: ${daftar.map((k) => `Paslon ${k.nomor_paslon}`).join(", ")}. Setelah sesi dibuka, data kandidat tidak dapat diubah atau dihapus.`
+    );
+  }
+
+  if (action === "close" && closingInProgress()) {
+    text = "Penutupan sudah dimulai (penerimaan suara baru sudah dihentikan). Anda akan melanjutkannya.";
+  }
+
+  if (action === "relayer") {
+    pendingRelayerAddress = ethers.getAddress(el.relayerInput.value.trim());
+    text = `Anda akan mendaftarkan ${pendingRelayerAddress} sebagai relayer.`;
+  }
+
   pendingAction = action;
   lastFocusedEl = document.activeElement;
 
   el.title.textContent = cfg.title;
-  el.text.textContent = cfg.text;
+  el.text.textContent = text;
   el.points.innerHTML = "";
-  cfg.points.forEach((p) => {
+  points.forEach((p) => {
     const li = document.createElement("li");
     li.textContent = p;
     el.points.appendChild(li);
@@ -507,10 +827,29 @@ function closeModal() {
   if (lastFocusedEl) lastFocusedEl.focus();
 }
 
+// ---------------------------------------------------------
+// Progres & eksekusi aksi
+// ---------------------------------------------------------
+function renderSteps(steps) {
+  el.steps.innerHTML = "";
+  steps.forEach((name) => {
+    const li = document.createElement("li");
+    li.dataset.step = name;
+    li.dataset.state = "pending";
+    li.textContent = STEP_LABEL[name];
+    el.steps.appendChild(li);
+  });
+}
+
 function setStep(name, state) {
-  currentStep = state === "active" ? name : currentStep;
+  if (state === "active") currentStep = name;
   const li = el.steps.querySelector(`[data-step="${name}"]`);
   if (li) li.dataset.state = state;
+}
+
+function setNote(text) {
+  el.note.textContent = text || "";
+  el.note.classList.toggle("hidden", !text);
 }
 
 function showResult(type, message, txHash) {
@@ -528,37 +867,125 @@ function showResult(type, message, txHash) {
   el.btnClose2.focus();
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function runTransaction() {
-  if (busy || !pendingAction || !wallet) return;
-  const action = pendingAction;
-  const cfg = TX_TEXT[action];
-
-  busy = true;
-  render();
-
-  // Pindah ke tampilan progres
+function showProgress(cfg) {
   el.viewConfirm.classList.add("hidden");
   el.viewProgress.classList.remove("hidden");
   el.progressTitle.textContent = cfg.progressTitle;
   el.result.className = "status-msg hidden";
   el.btnClose2.classList.add("hidden");
-  el.steps.querySelectorAll("li").forEach((li) => (li.dataset.state = "pending"));
+  el.btnAbort.classList.add("hidden");
+  el.btnAbort.disabled = false;
+  setNote("");
+  renderSteps(cfg.steps);
   currentStep = null;
+}
+
+function buildCall(contract, action) {
+  if (action === "open") return { method: contract.openSession, args: [pendingNumbers] };
+  if (action === "close") return { method: contract.closeSession, args: [] };
+  return { method: contract.setRelayer, args: [pendingRelayerAddress] };
+}
+
+// Membaca status terbaru lewat provider wallet (agar tidak tertinggal dari RPC publik)
+async function readBack(cfg) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const state = await readSessionState(getSessionContract(wallet.provider));
+    if (cfg.confirmState(state)) return state;
+    await sleep(1000);
+  }
+  throw new Error('Transaksi terkonfirmasi, tetapi status terbaru belum terbaca. Klik "Muat ulang" beberapa saat lagi.');
+}
+
+// Tidur yang bisa dibatalkan (untuk tombol "Batalkan penutupan")
+async function sleepAbortable(ms) {
+  const mulai = Date.now();
+  while (Date.now() - mulai < ms) {
+    if (abortRequested) return;
+    await sleep(250);
+  }
+}
+
+// Tahap penutupan: hentikan suara baru di database, lalu tunggu relayer mengosongkan antrian.
+async function prepareClose() {
+  setStep("stop", "active");
+  if (!dbState || dbState.status === "berlangsung") await setDbStatus("menutup");
+  render();
+  setStep("stop", "done");
+
+  setStep("flush", "active");
+  abortRequested = false;
+  el.btnAbort.classList.remove("hidden");
+  try {
+    for (; ;) {
+      if (abortRequested) throw { aborted: true };
+
+      let sisa = null;
+      try {
+        const s = await fetchSummary();
+        if (s) sisa = s.menunggu + s.diproses;
+        await loadRelayerRow();
+      } catch (e) {
+        sisa = null;
+      }
+
+      if (sisa === 0) break;
+
+      const health = relayerHealth();
+      let pesan =
+        sisa === null
+          ? "Gagal membaca isi antrian, mencoba lagi..."
+          : `Menunggu ${sisa} suara terkirim ke blockchain oleh relayer...`;
+      if (health.state === "bad") {
+        pesan += " Relayer tampak tidak aktif atau bermasalah: jalankan relayer, atau batalkan penutupan.";
+      }
+      setNote(pesan);
+
+      await sleepAbortable(QUEUE_POLL_MS);
+    }
+  } finally {
+    el.btnAbort.classList.add("hidden");
+    setNote("");
+  }
+  setStep("flush", "done");
+  currentStep = null;
+}
+
+async function handleAbort() {
+  setStep("flush", "error");
+  try {
+    await setDbStatus("berlangsung");
+    render();
+    showResult("info", "Penutupan dibatalkan. Sesi kembali berlangsung dan mahasiswa dapat memilih lagi.");
+    showToast("info", "Penutupan dibatalkan.");
+  } catch (err) {
+    render();
+    showResult("error", `Gagal membatalkan penutupan: ${err.message} Coba klik "Batalkan penutupan" di halaman ini.`);
+  }
+}
+
+async function runAction() {
+  if (busy || !pendingAction || !wallet) return;
+  const action = pendingAction;
+  const cfg = ACTIONS[action];
+
+  busy = true;
+  render();
+  showProgress(cfg);
 
   let txHash = null;
   try {
-    // 1) Simulasi dulu (tanpa biaya): jika kontrak akan menolak, pesannya jelas
-    //    dan admin tidak membuang gas untuk transaksi yang pasti gagal.
+    if (action === "close") await prepareClose();
+
+    // 1) Simulasi dulu (tanpa biaya): jika kontrak akan menolak, pesannya jelas dan admin
+    //    tidak membuang gas untuk transaksi yang pasti gagal.
     setStep("wallet", "active");
     const signer = await wallet.provider.getSigner(wallet.address);
     const contract = getSessionContract(signer);
-    const method = action === "open" ? contract.openSession : contract.closeSession;
-    await method.staticCall();
+    const call = buildCall(contract, action);
+    await call.method.staticCall(...call.args);
 
     // 2) Kirim transaksi -> MetaMask meminta konfirmasi admin di sini
-    const tx = await method();
+    const tx = await call.method(...call.args);
     txHash = tx.hash;
     setStep("wallet", "done");
 
@@ -569,31 +996,36 @@ async function runTransaction() {
     setStep("chain", "done");
     currentStep = null; // transaksi sudah sah di blockchain; kegagalan berikutnya bukan kegagalan tahap ini
 
-    // 4) Baca status terbaru (lewat provider wallet agar tidak tertinggal RPC publik)
-    let state = null;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      state = await readSessionState(getSessionContract(wallet.provider));
-      if (state.status === cfg.expectedStatus) break;
-      await sleep(1000);
-    }
-    if (!state || state.status !== cfg.expectedStatus) {
-      throw new Error("Transaksi terkonfirmasi, tetapi status terbaru belum terbaca. Klik \"Muat ulang\" beberapa saat lagi.");
-    }
+    // 4) Baca status terbaru
+    const state = await readBack(cfg);
     chainState = state;
     chainError = null;
 
-    // 5) Simpan salinan ke database
-    setStep("db", "active");
-    dbState = await syncDatabase(state, txHash, action);
-    syncError = null;
-    setStep("db", "done");
+    // 5) Simpan salinan ke database (hanya untuk buka/tutup sesi)
+    if (cfg.steps.includes("db")) {
+      setStep("db", "active");
+      dbState = await syncDatabase(state, txHash, action);
+      syncError = null;
+      setStep("db", "done");
+    }
 
     busy = false;
     render();
     showResult("success", cfg.success, txHash);
     showToast("success", cfg.success);
+
+    if (action === "relayer") el.relayerInput.value = "";
+    loadLive()
+      .then(render)
+      .catch(() => { });
   } catch (e) {
     busy = false;
+
+    if (e && e.aborted) {
+      await handleAbort();
+      return;
+    }
+
     if (currentStep) setStep(currentStep, "error");
 
     const d = describeChainError(e);
@@ -603,17 +1035,55 @@ async function runTransaction() {
       message = `Transaksi berhasil di blockchain, tetapi database gagal diperbarui: ${e.message} Muat ulang halaman ini; sinkronisasi dilakukan otomatis.`;
       syncError = e.message;
     }
+    // Penutupan terhenti di tengah jalan: beri tahu keadaan dan pilihan berikutnya
+    if (action === "close" && closingInProgress()) {
+      message += ' Penerimaan suara sudah dihentikan. Klik "Lanjutkan Penutupan" untuk mencoba lagi, atau "Batalkan penutupan" untuk membuka kembali sesi.';
+    }
+
     render();
     showResult(d.type === "info" ? "info" : "error", message, txHash);
-    showToast(d.type === "info" ? "info" : "error", d.type === "info" ? "Transaksi dibatalkan." : "Transaksi tidak selesai.");
+    showToast(d.type === "info" ? "info" : "error", d.type === "info" ? "Transaksi dibatalkan." : "Proses tidak selesai.");
   }
 }
 
+// ---------------------------------------------------------
+// Event
+// ---------------------------------------------------------
+el.btnConnect.addEventListener("click", connectWallet);
+el.btnSwitch.addEventListener("click", switchNetwork);
+
+el.refreshBtn.addEventListener("click", async () => {
+  if (busy) return;
+  if (blockchainConfigProblem()) return;
+  await loadAll();
+  showToast("info", "Data diperbarui dari blockchain dan database.");
+});
+
 el.btnOpen.addEventListener("click", () => openConfirm("open"));
 el.btnClose.addEventListener("click", () => openConfirm("close"));
+el.btnSetRelayer.addEventListener("click", () => openConfirm("relayer"));
+el.relayerInput.addEventListener("input", renderRelayerForm);
+
+el.btnCancelClose.addEventListener("click", async () => {
+  if (busy || !closingInProgress()) return;
+  el.btnCancelClose.disabled = true;
+  try {
+    await setDbStatus("berlangsung");
+    showToast("info", "Penutupan dibatalkan. Sesi kembali berlangsung.");
+  } catch (e) {
+    showToast("error", `Gagal membatalkan penutupan: ${e.message}`);
+  }
+  render();
+});
+
 el.btnCancel.addEventListener("click", closeModal);
-el.btnConfirm.addEventListener("click", runTransaction);
+el.btnConfirm.addEventListener("click", runAction);
 el.btnClose2.addEventListener("click", closeModal);
+el.btnAbort.addEventListener("click", () => {
+  abortRequested = true;
+  el.btnAbort.disabled = true;
+  setNote("Membatalkan penutupan...");
+});
 
 // Klik di luar kotak = batal (hanya saat belum memproses)
 el.overlay.addEventListener("click", (e) => {

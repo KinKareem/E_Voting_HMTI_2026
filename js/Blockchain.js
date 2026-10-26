@@ -59,9 +59,11 @@ function getSessionContract(runner) {
 // Membaca seluruh keadaan sesi dari kontrak.
 // Waktu dikembalikan dalam detik unix (0 = belum terjadi); alamat null jika belum terjadi.
 async function readSessionState(contract) {
-  const [status, owner, openedBy, openedAt, closedBy, closedAt] = await Promise.all([
+  const [status, owner, relayer, totalVotes, openedBy, openedAt, closedBy, closedAt] = await Promise.all([
     contract.status(),
     contract.owner(),
+    contract.relayer(),
+    contract.totalVotes(),
     contract.openedBy(),
     contract.openedAt(),
     contract.closedBy(),
@@ -73,11 +75,20 @@ async function readSessionState(contract) {
     status: statusNum,
     statusKey: CHAIN_STATUS_KEYS[statusNum] || "tidak_diketahui",
     owner,
+    relayer,
+    totalVotes: Number(totalVotes),
     openedAt: Number(openedAt),
     openedBy: openedAt > 0n ? openedBy : null,
     closedAt: Number(closedAt),
     closedBy: closedAt > 0n ? closedBy : null,
   };
+}
+
+// Membaca hitungan suara semua paslon dari kontrak.
+// Mengembalikan { numbers: [1, 2, ...], counts: [12, 9, ...] } (urut sama).
+async function readResults(contract) {
+  const [numbers, counts] = await contract.getResults();
+  return { numbers: numbers.map(Number), counts: counts.map(Number) };
 }
 
 // Mengubah error dari ethers/MetaMask menjadi pesan yang mudah dimengerti.
@@ -105,6 +116,18 @@ function describeChainError(e) {
     }
     if (e.revert.name === "InvalidState") {
       return { type: "error", message: "Aksi ini tidak dapat dilakukan pada status sesi saat ini." };
+    }
+    if (e.revert.name === "InvalidCandidates") {
+      return {
+        type: "error",
+        message: "Daftar nomor paslon tidak valid (kosong, lebih dari 50, berisi 0, atau ada nomor ganda). Periksa data kandidat.",
+      };
+    }
+    if (e.revert.name === "ZeroAddress") {
+      return { type: "error", message: "Alamat tidak boleh kosong atau alamat nol." };
+    }
+    if (e.revert.name === "NotRelayer") {
+      return { type: "error", message: "Wallet ini bukan relayer yang terdaftar di kontrak." };
     }
   }
   // Tidak ada kontrak di alamat tersebut (alamat salah, atau jaringan tidak cocok)

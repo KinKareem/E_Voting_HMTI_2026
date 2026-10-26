@@ -1598,3 +1598,85 @@ table.data-table td.muted {
     width: 100%;
   }
 }
+
+/* =========================================================
+   SESI VOTING: panel relayer & hasil (tambahan)
+   ========================================================= */
+
+.panel-wide {
+  margin-top: 24px;
+}
+
+.panel-note-top {
+  margin: -8px 0 12px;
+}
+
+.session-badge[data-state="closing"] {
+  background: rgba(201, 162, 39, 0.18);
+  color: var(--bark-800);
+}
+
+.detail-list dd[data-state="ok"] {
+  color: #166534;
+}
+
+.detail-list dd[data-state="bad"] {
+  color: #b91c1c;
+}
+
+.relayer-form {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(62, 39, 35, 0.08);
+}
+
+.relayer-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bark-800);
+}
+
+.relayer-row {
+  display: flex;
+  gap: 10px;
+}
+
+.relayer-row input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--bark-900);
+  background: #fff;
+}
+
+.relayer-row input:focus {
+  border-color: var(--gold-500);
+  box-shadow: 0 0 0 1px var(--gold-500);
+  outline: none;
+}
+
+.relayer-row .btn-outline {
+  white-space: nowrap;
+}
+
+.relayer-row .btn-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+tr.row-top td {
+  background: rgba(201, 162, 39, 0.12);
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .relayer-row {
+    flex-direction: column;
+  }
+}
