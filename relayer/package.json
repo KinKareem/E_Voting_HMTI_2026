@@ -11,11 +11,14 @@
     "start": "node relayer.js",
     "sekali": "node relayer.js --sekali",
     "paksa": "node relayer.js --sekali --paksa",
-    "buat-wallet": "node buat-wallet.js"
+    "buat-wallet": "node buat-wallet.js",
+    "buat-akun": "node buat-akun-mahasiswa.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "dotenv": "^16.4.5",
-    "ethers": "6.13.4"
+    "ethers": "6.13.4",
+    "papaparse": "^5.4.1",
+    "xlsx": "^0.18.5"
   }
 }

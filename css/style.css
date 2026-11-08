@@ -4,27 +4,39 @@
    Font: Playfair Display (judul) + Lora (isi) — classic serif
    ========================================================= */
 
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+
 :root {
-  --bark-950: #2a1b12;
-  --bark-900: #3e2723;
-  --bark-800: #4e2f26;
-  --bark-700: #6b4226;
-  --bark-600: #7c5335;
-
-  --gold-400: #e4c466;
-  --gold-500: #c9a227;
-  --gold-600: #ad8a1f;
-
-  --cream: #faf6ef;
-  --ivory: #fffdf9;
-
-  --border-soft: rgba(62, 39, 35, 0.12);
-  --shadow-panel: 0 30px 60px -20px rgba(42, 27, 18, 0.45);
-  --page-pad: clamp(20px, 4vw, 64px);
-  /* jarak kiri-kanan halaman, ikut lebar layar */
-
-  --font-display: "Playfair Display", Georgia, serif;
-  --font-body: "Lora", Georgia, serif;
+  /* palet baru */
+  --ink: #1b1c1c;
+  --mist: #e4dfdc;
+  --brown: #8d5815;
+  --espresso: #462814;
+  --amber: #e2983a;
+  --gold: #deab57;
+  --paper: #f4f1ef;
+  --card: #fff;
+  --line: rgba(27, 28, 28, .1);
+  --muted: #6b645f;
+  --pad: clamp(20px, 4vw, 64px);
+  --r: 18px;
+  --font: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* nama lama (dipakai halaman admin) dipetakan ke palet baru */
+  --bark-950: #141515;
+  --bark-900: #1b1c1c;
+  --bark-800: #2b1d12;
+  --bark-700: #462814;
+  --bark-600: #8d5815;
+  --gold-400: #deab57;
+  --gold-500: #e2983a;
+  --gold-600: #8d5815;
+  --cream: #f4f1ef;
+  --ivory: #ffffff;
+  --border-soft: rgba(27, 28, 28, .1);
+  --shadow-panel: 0 30px 60px -20px rgba(0, 0, 0, .45);
+  --page-pad: var(--pad);
+  --font-display: var(--font);
+  --font-body: var(--font);
 }
 
 * {
@@ -79,277 +91,341 @@ a:focus-visible {
 }
 
 /* =========================================================
-   HALAMAN AUTH (Login/Register) — kartu dengan box sliding
+   KOMPONEN DASAR (form, tombol, status) & HALAMAN AUTH — tampilan modern
    ========================================================= */
+h1,
+h2,
+h3 {
+  letter-spacing: -.02em;
+  line-height: 1.15
+}
 
+.gold-rule {
+  height: 3px;
+  width: 44px;
+  border-radius: 3px;
+  background: var(--amber);
+  margin: 18px 0
+}
+
+/* ---------- form & tombol ---------- */
+.field {
+  margin-bottom: 16px
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  transition: border-color .2s, background .2s, box-shadow .2s
+}
+
+.field textarea {
+  resize: vertical;
+  line-height: 1.5
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: #a39b95
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  background: #fff;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 4px rgba(226, 152, 58, .18)
+}
+
+.btn-primary,
+.btn-outline {
+  font: inherit;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  transition: background .2s, transform .15s, border-color .2s, color .2s
+}
+
+/* .btn-hero dianimasikan GSAP: JANGAN transisi `transform` (tombol bisa tersangkut bergeser). Hover pakai `translate`. */
+.btn-hero {
+  transition: background .2s, translate .2s
+}
+
+.btn-hero:hover {
+  translate: 0 -2px
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px 20px;
+  background: var(--ink);
+  color: #fff
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--espresso)
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(.98)
+}
+
+.btn-primary:disabled,
+.btn-outline:disabled {
+  opacity: .55;
+  cursor: not-allowed
+}
+
+.btn-outline {
+  padding: 9px 16px;
+  font-size: 13px;
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line)
+}
+
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--ink)
+}
+
+.status-msg {
+  padding: 11px 14px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  margin-bottom: 16px;
+  background: #fff6e8;
+  color: var(--espresso);
+  border: 1px solid rgba(226, 152, 58, .4)
+}
+
+.status-msg.error {
+  background: #fdecea;
+  color: #8a1c14;
+  border-color: #f3c1bc
+}
+
+.status-msg.success {
+  background: #eaf6ee;
+  color: #1d5a32;
+  border-color: #bfe0c9
+}
+
+/* ---------- halaman auth ---------- */
 .auth-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+  background: #fff
 }
 
 .auth-card {
   width: 100%;
-  max-width: 920px;
-  background: var(--ivory);
-  border-radius: 28px;
-  box-shadow: var(--shadow-panel);
-  overflow: hidden;
+  max-width: 960px;
   display: grid;
-  grid-template-columns: 1.05fr 1fr;
+  grid-template-columns: 1fr 1.05fr;
+  background: #fff;
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow: 0 30px 60px -30px rgba(70, 40, 20, .28)
 }
 
 .brand-panel {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  gap: 28px;
   padding: 44px 40px;
-  color: var(--cream);
-  background: linear-gradient(160deg, var(--bark-950), var(--bark-900) 55%, var(--bark-700));
+  color: var(--mist);
+  background: linear-gradient(160deg, var(--brown), var(--espresso))
+}
+
+.brand-logo {
+  width: min(230px, 70%);
+  padding: 14px;
+  background: var(--mist);
+  border-radius: 26px;
+  margin-bottom: 28px
 }
 
 .brand-eyebrow {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: var(--gold-400);
-  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 10px
 }
 
 .brand-title {
-  font-size: 28px;
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--ivory);
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 700;
+  color: #fff
 }
 
 .brand-description {
-  max-width: 300px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: rgba(250, 246, 239, 0.8);
+  color: rgba(255, 255, 255, .9);
+  max-width: 36ch
 }
 
 .brand-footer {
-  font-size: 12px;
-  color: rgba(250, 246, 239, 0.5);
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, .75)
 }
 
 .form-panel {
-  display: flex;
-  flex-direction: column;
   padding: 40px;
+  display: flex;
+  flex-direction: column
 }
 
 .tabs {
   display: flex;
-  max-width: 280px;
-  margin: 0 auto 28px;
-  background: rgba(62, 39, 35, 0.06);
-  border-radius: 999px;
+  gap: 4px;
   padding: 4px;
+  background: var(--paper);
+  border-radius: 14px;
+  margin-bottom: 28px
 }
 
 .tab-btn {
   flex: 1;
-  border: none;
+  padding: 10px;
+  border: 0;
+  border-radius: 11px;
   background: transparent;
-  padding: 10px 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--bark-700);
-  border-radius: 999px;
-  transition: background-color 0.2s, color 0.2s;
+  font-weight: 700;
+  color: var(--muted);
+  transition: background .25s, color .25s, box-shadow .25s
 }
 
 .tab-btn.active {
-  background: var(--bark-900);
-  color: var(--gold-400);
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(27, 28, 28, .12)
 }
 
 .auth-track-wrap {
   position: relative;
   flex: 1;
   overflow: hidden;
+  margin: -6px;
+  padding: 6px
 }
 
 .auth-track {
   display: flex;
   width: 200%;
-  transition: transform 0.45s ease-in-out;
-  transform: translateX(0%);
+  transition: transform .45s cubic-bezier(.65, 0, .35, 1);
+  transform: translateX(0)
 }
 
 .auth-track.show-register {
-  transform: translateX(-50%);
+  transform: translateX(-50%)
 }
 
 .auth-pane {
   width: 50%;
+  padding: 0 6px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 0 4px;
+  justify-content: center
 }
 
 .pane-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: var(--bark-900);
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 4px
 }
 
 .pane-subtitle {
+  color: var(--muted);
   font-size: 14px;
-  color: var(--bark-700);
+  margin-bottom: 22px
+}
+
+.field-forgot {
+  text-align: right;
+  margin: -6px 0 18px;
+  font-size: 13px
+}
+
+.field-forgot a,
+.auth-footer a {
+  color: var(--brown);
+  font-weight: 600;
+  text-decoration: none
+}
+
+.field-forgot a:hover,
+.auth-footer a:hover {
+  text-decoration: underline
+}
+
+.auth-card-single {
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border-radius: 24px;
+  padding: 36px;
+  border: 1px solid var(--line);
+  box-shadow: 0 30px 60px -30px rgba(70, 40, 20, .28)
+}
+
+.auth-card-single .brand-logo {
+  width: 130px;
   margin: 0 0 20px;
+  padding: 10px;
+  border-radius: 20px
+}
+
+.auth-card-single .brand-eyebrow {
+  color: var(--brown) !important;
+  margin-bottom: 6px
 }
 
 .auth-footer {
   margin-top: 20px;
   text-align: center;
-  font-size: 14px;
-  color: var(--bark-700);
+  font-size: 14px
 }
 
-.auth-footer a {
-  font-weight: 500;
-  color: var(--bark-900);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+@media(max-width:860px) {
+  .auth-card {
+    grid-template-columns: 1fr
+  }
+
+  .brand-panel {
+    padding: 28px
+  }
+
+  .brand-logo {
+    width: 150px;
+    margin-bottom: 18px
+  }
+
+  .form-panel {
+    padding: 28px
+  }
 }
 
-/* Kartu kecil tunggal (lupa password) */
-.auth-card-single {
-  width: 100%;
-  max-width: 380px;
-  background: var(--ivory);
-  border-radius: 28px;
-  box-shadow: var(--shadow-panel);
-  padding: 40px;
-}
-
-/* =========================================================
-   FORM ELEMENTS
-   ========================================================= */
-
-.field {
-  margin-bottom: 16px;
-}
-
-.field label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--bark-800);
-}
-
-.field input,
-.field textarea {
-  width: 100%;
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 14px;
-  font-family: var(--font-body);
-  color: var(--bark-900);
-  background: #fff;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.field textarea {
-  resize: vertical;
-  line-height: 1.5;
-}
-
-.field input::placeholder {
-  color: rgba(62, 39, 35, 0.3);
-}
-
-.field input:focus,
-.field textarea:focus {
-  border-color: var(--gold-500);
-  box-shadow: 0 0 0 1px var(--gold-500);
-  outline: none;
-}
-
-.field-forgot {
-  text-align: right;
-  margin-bottom: 20px;
-}
-
-.field-forgot a {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--bark-700);
-  text-decoration: none;
-}
-
-.field-forgot a:hover {
-  color: var(--gold-600);
-}
-
-.btn-primary {
-  width: 100%;
-  border: none;
-  border-radius: 10px;
-  padding: 11px 0;
-  font-size: 14px;
-  font-weight: 600;
-  background: var(--bark-900);
-  color: var(--gold-400);
-  transition: background-color 0.2s, opacity 0.2s;
-}
-
-.btn-primary:hover {
-  background: var(--bark-950);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-outline {
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  background: #fff;
-  color: var(--bark-800);
-  transition: background-color 0.2s;
-}
-
-.btn-outline:hover {
-  background: rgba(62, 39, 35, 0.05);
-}
-
-.status-msg {
-  margin-bottom: 16px;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  border: 1px solid transparent;
-}
-
-.status-msg.success {
-  background: #f0faf0;
-  border-color: rgba(22, 163, 74, 0.2);
-  color: #166534;
-}
-
-.status-msg.error {
-  background: #fef2f2;
-  border-color: rgba(220, 38, 38, 0.2);
-  color: #b91c1c;
-}
-
-.status-msg.hidden {
-  display: none;
+@media(prefers-reduced-motion:reduce) {
+  * {
+    transition-duration: .01ms !important
+  }
 }
 
 /* =========================================================
@@ -778,7 +854,7 @@ table.data-table td.muted {
   }
 
   .brand-panel {
-    display: none;
+    display: flex;
   }
 
   .form-panel {
@@ -1679,4 +1755,472 @@ tr.row-top td {
   .relayer-row {
     flex-direction: column;
   }
+}
+
+/* =========================================================
+   ADMIN — tampilan modern (putih, palet HMTI, Poppins)
+   ========================================================= */
+.logo-tile {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--mist);
+  flex-shrink: 0
+}
+
+.logo-tile img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain
+}
+
+.admin-layout,
+.dashboard-main {
+  background: #fff
+}
+
+.sidebar {
+  width: 272px;
+  background: var(--espresso);
+  color: var(--mist);
+  border-right: 0
+}
+
+.sidebar.open {
+  box-shadow: 0 0 60px rgba(27, 28, 28, .25)
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px
+}
+
+.sidebar-header .logo-tile {
+  width: 42px;
+  height: 42px
+}
+
+.sidebar-brand {
+  flex: 1;
+  min-width: 0
+}
+
+.sidebar-eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--brown);
+  margin: 0
+}
+
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2
+}
+
+.sidebar-rule {
+  height: 1px;
+  background: rgba(228, 223, 220, .15)
+}
+
+.sidebar-nav {
+  padding: 18px 14px
+}
+
+.sidebar-link {
+  padding: 11px 14px;
+  border-radius: 12px;
+  font-weight: 500;
+  color: rgba(228, 223, 220, .78)
+}
+
+.sidebar-link:hover {
+  background: rgba(228, 223, 220, .1);
+  color: #fff
+}
+
+.sidebar-link.active {
+  background: rgba(226, 152, 58, .22);
+  color: var(--gold);
+  font-weight: 600
+}
+
+.sidebar-link.active svg {
+  color: var(--gold)
+}
+
+.sidebar-footer {
+  display: grid;
+  gap: 10px;
+  padding: 14px
+}
+
+.sidebar-credit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(228, 223, 220, .08)
+}
+
+.sidebar-credit .logo-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--mist)
+}
+
+.sidebar-credit .logo-tile img {
+  width: 26px;
+  height: 26px
+}
+
+.sidebar-credit p {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(228, 223, 220, .8)
+}
+
+.sidebar-logout {
+  justify-content: center;
+  border: 1.5px solid rgba(228, 223, 220, .28);
+  font-weight: 600;
+  color: var(--mist)
+}
+
+.sidebar-logout:hover {
+  background: var(--mist);
+  border-color: var(--mist);
+  color: var(--ink)
+}
+
+.mobile-menu-btn {
+  background: var(--espresso);
+  color: var(--gold);
+  border: 0
+}
+
+.sidebar-overlay {
+  background: rgba(27, 28, 28, .4)
+}
+
+.page-header {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line)
+}
+
+.page-eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--brown)
+}
+
+.page-title {
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 700;
+  letter-spacing: -.02em
+}
+
+.page-subtitle {
+  color: var(--muted)
+}
+
+.table-card,
+.upload-card,
+.panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px -34px rgba(70, 40, 20, .5)
+}
+
+table.data-table thead {
+  background: var(--paper)
+}
+
+table.data-table th {
+  padding: 13px 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted)
+}
+
+table.data-table td {
+  padding: 14px 20px;
+  border-top: 1px solid var(--line)
+}
+
+table.data-table tbody tr:not(.row-top):hover td {
+  background: #faf8f6
+}
+
+.panel-title {
+  font-weight: 600
+}
+
+.btn-approve {
+  border-radius: 10px;
+  padding: 7px 14px;
+  font-weight: 600;
+  background: var(--amber);
+  color: var(--ink);
+  transition: background .2s
+}
+
+.btn-approve:hover {
+  background: var(--gold)
+}
+
+.btn-reject {
+  border-radius: 10px;
+  padding: 7px 14px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: border-color .2s, color .2s
+}
+
+.btn-reject:hover {
+  border-color: #b91c1c;
+  color: #b91c1c
+}
+
+.badge {
+  padding: 4px 12px;
+  font-weight: 600
+}
+
+.badge.not-voted {
+  background: var(--paper);
+  color: var(--muted)
+}
+
+.filter-pill {
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-weight: 500;
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  transition: background .2s, color .2s, border-color .2s
+}
+
+.filter-pill:hover {
+  border-color: var(--amber);
+  color: var(--ink)
+}
+
+.filter-pill.active {
+  background: rgba(226, 152, 58, .16);
+  border-color: var(--amber);
+  color: var(--espresso);
+  font-weight: 600
+}
+
+.search-input {
+  border: 1.5px solid transparent;
+  background: var(--paper);
+  border-radius: 12px;
+  font-family: var(--font);
+  transition: border-color .2s, background .2s, box-shadow .2s
+}
+
+.search-input:focus {
+  outline: none;
+  background: #fff;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 4px rgba(226, 152, 58, .18)
+}
+
+.dropzone {
+  border: 2px dashed rgba(226, 152, 58, .55);
+  background: rgba(226, 152, 58, .05);
+  border-radius: 16px;
+  transition: background .2s, border-color .2s
+}
+
+.dropzone:hover {
+  background: rgba(226, 152, 58, .12);
+  border-color: var(--amber)
+}
+
+.modal-overlay {
+  background: rgba(27, 28, 28, .45);
+  backdrop-filter: blur(4px)
+}
+
+.modal {
+  border-radius: 24px;
+  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, .45)
+}
+
+.kandidat-card {
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 40px -34px rgba(70, 40, 20, .5)
+}
+
+.kandidat-role {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  color: var(--brown)
+}
+
+.toast {
+  border-radius: 14px
+}
+
+/* ---------- Halaman "Pernah login" & tombol tautan ---------- */
+.btn-block {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 20px;
+  text-align: center;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 12px
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brown);
+  text-decoration: underline;
+  cursor: pointer
+}
+
+.akun-card {
+  max-width: 480px
+}
+
+.akun-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto
+}
+
+.akun-row {
+  display: flex;
+  align-items: center;
+  gap: 6px
+}
+
+.akun-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--paper);
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color .2s, background .2s
+}
+
+.akun-item:hover {
+  border-color: var(--amber)
+}
+
+.akun-item.active {
+  background: rgba(226, 152, 58, .14);
+  border-color: var(--amber)
+}
+
+.akun-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  background: var(--amber);
+  color: var(--ink)
+}
+
+.akun-info {
+  flex: 1;
+  min-width: 0
+}
+
+.akun-nama {
+  font-weight: 600;
+  font-size: 14.5px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.akun-nim {
+  font-size: 12.5px;
+  color: var(--muted)
+}
+
+.akun-badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: #eaf6ee;
+  color: #1d5a32
+}
+
+.akun-hapus {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .2s, color .2s
+}
+
+.akun-hapus:hover {
+  background: var(--paper);
+  color: #b91c1c
+}
+
+.akun-kosong {
+  padding: 24px 14px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+  border: 1.5px dashed rgba(27, 28, 28, .2);
+  border-radius: 14px
 }

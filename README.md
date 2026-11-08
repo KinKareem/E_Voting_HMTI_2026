@@ -58,8 +58,7 @@ Skrip juga aman dijalankan berulang kali.
 | Tabel | Fungsi | Sebelumnya |
 |---|---|---|
 | `tb_pengguna` | Akun login mahasiswa & admin, status persetujuan, status sudah voting | `profiles` |
-| `tb_mahasiswa` | Data master mahasiswa hasil upload CSV (menu Tambah Siswa) | `mahasiswa_whitelist` |
-| `tb_kandidat` | Pasangan calon + `foto_path` (menu Kandidat) | *baru* |
+| `tb_kandidat` | Data calon Ketua + `foto_path` (menu Kandidat) | *baru* |
 | `tb_log_admin` | Riwayat buka/tutup sesi voting yang tampil di landing page | *baru* |
 | `tb_suara` | Suara anonim — **tidak punya kolom yang menunjuk ke pemilih** | *baru* |
 
