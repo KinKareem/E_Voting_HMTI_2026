@@ -21,22 +21,21 @@ const Auth = {
       };
     }
 
-    const { error: profileError } = await sb.from("tb_pengguna").insert({
-      id: signUpData.user.id,
-      nim,
-      nama_lengkap: namaLengkap,
-      email,
-      role: "mahasiswa",
-      status: "pending",
-      has_voted: false,
+    // Mengaitkan akun login dengan baris mahasiswa di tb_pengguna (data dari menu Tambah Siswa),
+    // atau membuat baris baru bila NIM belum pernah ditambahkan admin (lihat fn_daftar_mahasiswa).
+    const { error: profileError } = await sb.rpc("fn_daftar_mahasiswa", {
+      p_nim: nim,
+      p_nama: namaLengkap,
+      p_email: email,
     });
 
     if (profileError) {
       return {
         success: false,
-        message: isDuplicateError(profileError)
-          ? "NIM ini sudah terdaftar sebelumnya."
-          : profileError.message,
+        message:
+          isDuplicateError(profileError) || profileError.message.toLowerCase().includes("sudah terdaftar")
+            ? "NIM ini sudah terdaftar sebelumnya."
+            : profileError.message,
       };
     }
 
@@ -88,7 +87,7 @@ const Auth = {
   async loginByNim({ nim, password, expectedRole }) {
     const email = await getEmailByNim(nim);
     if (!email) {
-      return { success: false, message: "NIM tidak ditemukan." };
+      return { success: false, message: "NIM tidak ditemukan atau belum mendaftar akun." };
     }
 
     const { data: signInData, error: signInError } = await sb.auth.signInWithPassword({
@@ -142,7 +141,7 @@ const Auth = {
   async requestPasswordReset(nim) {
     const email = await getEmailByNim(nim);
     if (!email) {
-      return { success: false, message: "NIM tidak ditemukan." };
+      return { success: false, message: "NIM tidak ditemukan atau belum mendaftar akun." };
     }
 
     const { error } = await sb.auth.resetPasswordForEmail(email, {

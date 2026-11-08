@@ -1,0 +1,532 @@
+{
+	"compiler": {
+		"version": "0.8.30+commit.73712a01"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "initialRelayer",
+						"type": "address"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"inputs": [],
+				"name": "InvalidBatch",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "number",
+						"type": "uint8"
+					}
+				],
+				"name": "InvalidCandidate",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "InvalidCandidates",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "enum VotingSession.Status",
+						"name": "current",
+						"type": "uint8"
+					}
+				],
+				"name": "InvalidState",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "NotOwner",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "NotRelayer",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "ZeroAddress",
+				"type": "error"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint8[]",
+						"name": "numbers",
+						"type": "uint8[]"
+					}
+				],
+				"name": "CandidatesRegistered",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "previousRelayer",
+						"type": "address"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "newRelayer",
+						"type": "address"
+					}
+				],
+				"name": "RelayerChanged",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "admin",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "SessionClosed",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "admin",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "SessionOpened",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "accepted",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "duplicates",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "totalVotes",
+						"type": "uint256"
+					}
+				],
+				"name": "VotesCast",
+				"type": "event"
+			},
+			{
+				"inputs": [],
+				"name": "MAX_BATCH",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "MAX_CANDIDATES",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "candidateCount",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32[]",
+						"name": "ids",
+						"type": "bytes32[]"
+					},
+					{
+						"internalType": "uint8[]",
+						"name": "numbers",
+						"type": "uint8[]"
+					}
+				],
+				"name": "castVotes",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "closeSession",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "closedAt",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "closedBy",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "getResults",
+				"outputs": [
+					{
+						"internalType": "uint8[]",
+						"name": "numbers",
+						"type": "uint8[]"
+					},
+					{
+						"internalType": "uint256[]",
+						"name": "counts",
+						"type": "uint256[]"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "",
+						"type": "uint8"
+					}
+				],
+				"name": "isCandidate",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8[]",
+						"name": "numbers",
+						"type": "uint8[]"
+					}
+				],
+				"name": "openSession",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "openedAt",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "openedBy",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "owner",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "relayer",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "newRelayer",
+						"type": "address"
+					}
+				],
+				"name": "setRelayer",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "status",
+				"outputs": [
+					{
+						"internalType": "enum VotingSession.Status",
+						"name": "",
+						"type": "uint8"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "totalVotes",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "",
+						"type": "bytes32"
+					}
+				],
+				"name": "voteCounted",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint8",
+						"name": "",
+						"type": "uint8"
+					}
+				],
+				"name": "votesFor",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"title": "VotingSession",
+			"version": 1
+		},
+		"userdoc": {
+			"errors": {
+				"InvalidBatch()": [
+					{
+						"notice": "Batch kosong, panjang array berbeda, atau lebih dari MAX_BATCH."
+					}
+				],
+				"InvalidCandidate(uint8)": [
+					{
+						"notice": "Nomor paslon pada suara tidak terdaftar."
+					}
+				],
+				"InvalidCandidates()": [
+					{
+						"notice": "Daftar nomor paslon kosong, terlalu banyak, berisi 0, atau berisi nomor ganda."
+					}
+				],
+				"InvalidState(uint8)": [
+					{
+						"notice": "Aksi tidak diizinkan pada status saat ini."
+					}
+				],
+				"NotOwner()": [
+					{
+						"notice": "Pemanggil bukan owner kontrak."
+					}
+				],
+				"NotRelayer()": [
+					{
+						"notice": "Pemanggil bukan relayer terdaftar."
+					}
+				],
+				"ZeroAddress()": [
+					{
+						"notice": "Alamat nol tidak diperbolehkan."
+					}
+				]
+			},
+			"kind": "user",
+			"methods": {
+				"candidateCount()": {
+					"notice": "Jumlah paslon yang terdaftar."
+				},
+				"castVotes(bytes32[],uint8[])": {
+					"notice": "Mengirim sekumpulan suara anonim. ids[i] = ID acak suara, numbers[i] = nomor paslon."
+				},
+				"closeSession()": {
+					"notice": "Menutup sesi voting secara permanen. Hanya bisa dari status Open."
+				},
+				"getResults()": {
+					"notice": "Hitungan suara semua paslon: numbers[i] memperoleh counts[i] suara."
+				},
+				"openSession(uint8[])": {
+					"notice": "Membuka sesi sekaligus menetapkan nomor paslon yang sah. Hanya sekali."
+				},
+				"owner()": {
+					"notice": "Wallet admin yang mendeploy kontrak. Tidak dapat diganti."
+				},
+				"relayer()": {
+					"notice": "Wallet yang boleh mengirim suara. Dapat diganti owner selama sesi belum Closed."
+				},
+				"setRelayer(address)": {
+					"notice": "Mengganti relayer (misal wallet lama hilang). Tidak bisa setelah sesi Closed."
+				}
+			},
+			"notice": "Kontrak pemilihan Ketua HMTI. Mencatat:         1. sesi voting: kapan DIBUKA dan DITUTUP, serta wallet admin yang melakukannya;         2. daftar nomor paslon yang sah (dikunci saat sesi dibuka);         3. suara anonim yang dikirim relayer, dan hitungan per paslon. Aturan (dijaga oleh kontrak, bukan oleh aplikasi):  1. Hanya OWNER (wallet yang mendeploy) yang dapat membuka/menutup sesi dan     mengganti relayer.  2. Urutan status satu arah: NotStarted -> Open -> Closed. Penutupan PERMANEN.  3. Nomor paslon yang sah ditetapkan sekali, saat sesi dibuka. Setelah itu tidak     bisa diubah.  4. Hanya RELAYER yang dapat mengirim suara, dan hanya saat sesi Open.  5. Setiap suara membawa ID acak. ID yang sudah pernah dihitung dilewati, sehingga     pengiriman ulang (misal relayer mati di tengah jalan) tidak pernah     menghitung suara dua kali.  6. Kontrak tidak menyimpan identitas pemilih; hanya nomor paslon dan ID acak. Catatan: seluruh data di blockchain publik dapat dibaca siapa saja, termasuk hitungan sementara selama voting berlangsung.",
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"VotingSession.sol": "VotingSession"
+		},
+		"evmVersion": "prague",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"VotingSession.sol": {
+			"keccak256": "0xed6b304e3860644127664b36a7ac437ab3024be7e4f69cbeb7ab24a6bec2fa90",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://94a9d0327d978424f052862375f77464b1e92d5c40660090e81610afcd9bce26",
+				"dweb:/ipfs/QmU3igzHRDFU5fVWTk35DiGjsnTVQtEmtUDFqBAqQabcCd"
+			]
+		}
+	},
+	"version": 1
+}

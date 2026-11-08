@@ -34,8 +34,11 @@ function renderSidebar() {
 
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <p class="sidebar-eyebrow">E-Voting HMTI</p>
-        <p class="sidebar-title">Panel Admin</p>
+        <span class="logo-tile"><img src="../logo/hmti.png" alt="Logo HMTI" /></span>
+        <div class="sidebar-brand">
+          <p class="sidebar-title">Panel Admin</p>
+        </div>
+        <span class="logo-tile"><img src="../logo/smft.png" alt="Logo SMFT" /></span>
       </div>
       <div class="sidebar-rule"></div>
 
@@ -44,6 +47,10 @@ function renderSidebar() {
       </nav>
 
       <div class="sidebar-footer">
+        <div class="sidebar-credit">
+          <span class="logo-tile"><img src="../logo/musang.png" alt="Logo Musang HMTI 2026" /></span>
+          <p>Musang HMTI 2026</p>
+        </div>
         <button type="button" class="sidebar-logout" id="sidebar-logout">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
             <path d="M9 4H5a2 2 0 00-2 2v12a2 2 0 002 2h4" stroke-linecap="round" stroke-linejoin="round" />

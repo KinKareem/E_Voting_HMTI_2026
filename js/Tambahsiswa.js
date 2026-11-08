@@ -1,4 +1,3 @@
-
 function showToast(type, message) {
   let box = document.getElementById("toast-container");
   if (!box) {
@@ -162,9 +161,22 @@ importBtn.addEventListener("click", async () => {
   importBtn.disabled = true;
   importBtn.textContent = "Mengimpor...";
 
-  const { error, count } = await sb
-    .from("tb_mahasiswa")
-    .upsert(parsedRows, { onConflict: "nim", count: "exact" });
+  // Langsung ke tb_pengguna. NIM yang sudah ada dilewati (tidak ditimpa) supaya status,
+  // role, dan hak suara akun yang sudah terdaftar tidak berubah.
+  const rows = parsedRows.map((r) => ({
+    nim: r.nim,
+    nama_lengkap: r.nama_lengkap || r.nim,
+    prodi: r.prodi || null,
+    angkatan: r.angkatan || null,
+    role: "mahasiswa",
+    status: "pending",
+    has_voted: false,
+  }));
+
+  const { data, error } = await sb
+    .from("tb_pengguna")
+    .upsert(rows, { onConflict: "nim", ignoreDuplicates: true })
+    .select("nim");
 
   importBtn.disabled = false;
   importBtn.textContent = "Impor ke Database";
@@ -174,7 +186,13 @@ importBtn.addEventListener("click", async () => {
     return;
   }
 
-  showToast("success", `Berhasil memasukkan ${count ?? parsedRows.length} data mahasiswa.`);
+  const masuk = data ? data.length : 0;
+  const dilewati = rows.length - masuk;
+  showToast(
+    "success",
+    `Berhasil memasukkan ${masuk} data mahasiswa.` +
+    (dilewati > 0 ? ` ${dilewati} NIM dilewati karena sudah ada.` : "")
+  );
 
   parsedRows = [];
   previewCard.className = "table-card hidden";

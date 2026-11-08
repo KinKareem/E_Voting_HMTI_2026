@@ -37,7 +37,6 @@ relayer/
   relayer.js             → Program yang mengirim antrian suara ke kontrak (npm start)
   PANDUAN_RELAYER.md     → Cara menyiapkan & menjalankan relayer
   buat-wallet.js         → Membuat wallet relayer baru (npm run buat-wallet)
-  .env.example           → Contoh pengaturan (salin menjadi .env, JANGAN dibagikan)
 
 supabase/
   schema.sql             → Skema database lengkap

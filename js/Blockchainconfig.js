@@ -8,7 +8,7 @@
 
 const BLOCKCHAIN = {
   // Alamat kontrak VotingSession hasil deploy, contoh: "0x1234...abcd"
-  CONTRACT_ADDRESS: "0x70344AC571ed3668F1dB392A6e62c3d82F189E80",
+  CONTRACT_ADDRESS: "0x991352F75B811Bb7A81d82C9259FE046DF3c9dE7",
 
   // Jaringan yang dipakai. Bawaan: Sepolia (jaringan uji, tanpa uang sungguhan).
   CHAIN_ID: 11155111,

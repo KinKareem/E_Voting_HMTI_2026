@@ -8,9 +8,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&display=swap"
-    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/landing.css" />
@@ -21,8 +19,11 @@
   <header class="landing-header" id="landing-header">
     <div class="landing-header-inner">
       <a href="#beranda" class="brand-mark">
-        <span class="brand-mark-eyebrow">E-Voting</span>
-        <span class="brand-mark-title">HMTI</span>
+        <span class="logo-tile"><img src="logo/hmti.png" alt="Logo HMTI" /></span>
+        <span class="brand-mark-text">
+          <span class="brand-mark-eyebrow">E-Voting</span>
+          <span class="brand-mark-title">HMTI</span>
+        </span>
       </a>
 
       <nav class="landing-nav" aria-label="Navigasi halaman">
@@ -38,6 +39,7 @@
         </div>
         <button type="button" class="btn-header-logout" id="logout-btn">Keluar</button>
       </div>
+      <span class="logo-tile"><img src="logo/smft.png" alt="Logo SMFT" /></span>
     </div>
   </header>
 
@@ -64,6 +66,26 @@
           </span>
         </div>
       </div>
+      <aside class="hero-steps" aria-label="Cara memilih">
+        <p class="hero-steps-title">Cara memilih</p>
+        <ol>
+          <li><span>1</span>
+            <div><strong>Kenali kandidat</strong>
+              <p>Baca visi dan misi setiap calon di bagian Kandidat.</p>
+            </div>
+          </li>
+          <li><span>2</span>
+            <div><strong>Pilih dan konfirmasi</strong>
+              <p>Saat sesi dibuka, tekan Pilih Paslon. Suara tidak dapat diubah setelah dikirim.</p>
+            </div>
+          </li>
+          <li><span>3</span>
+            <div><strong>Suara tercatat</strong>
+              <p>Suara masuk ke blockchain dan jumlahnya bisa diperiksa di bagian Transparansi.</p>
+            </div>
+          </li>
+        </ol>
+      </aside>
     </section>
 
     <!-- ===================== KANDIDAT ===================== -->
@@ -71,7 +93,7 @@
       <div>
         <div class="section-head" data-reveal>
           <p class="section-eyebrow">Pasangan Calon</p>
-          <h2 class="section-title">Kandidat Ketua &amp; Wakil Ketua</h2>
+          <h2 class="section-title">Kandidat Ketua</h2>
           <div class="gold-rule"></div>
         </div>
 
@@ -138,9 +160,15 @@
           <div class="gold-rule"></div>
         </div>
 
-        <ol class="log-list" id="log-list">
-          <li class="log-empty">Memuat riwayat...</li>
-        </ol>
+        <div class="log-box">
+          <div class="log-box-head">
+            <h3>Catatan sesi voting</h3>
+            <span class="log-box-tag">Dibaca dari blockchain</span>
+          </div>
+          <ol class="log-list" id="log-list">
+            <li class="log-empty">Memuat riwayat...</li>
+          </ol>
+        </div>
       </div>
     </section>
   </main>
@@ -148,13 +176,70 @@
   <!-- ===================== FOOTER ===================== -->
   <footer class="landing-footer">
     <div class="landing-footer-inner">
-      <div>
-        <p class="footer-brand">E-Voting HMTI</p>
-        <p class="footer-text">
-          Sistem Pemilihan Ketua HMTI Berbasis Blockchain &middot; Teknologi Informasi,
-          Fakultas Teknik, Universitas Udayana
-        </p>
+      <div class="footer-grid">
+        <div class="footer-about">
+          <div class="footer-logos">
+            <span class="logo-tile"><img src="logo/hmti.png" alt="Logo HMTI" /></span>
+            <span class="logo-tile"><img src="logo/smft.png" alt="Logo SMFT" /></span>
+            <span class="logo-tile"><img src="logo/musang.png" alt="Logo Musang HMTI 2026" /></span>
+          </div>
+          <p class="footer-brand">E-Voting HMTI</p>
+          <p class="footer-text">
+            Sistem Pemilihan Ketua HMTI Berbasis Blockchain. Satu mahasiswa satu suara, tercatat aman dan transparan.
+          </p>
+          <!-- GANTI href "#" dengan tautan akun resmi HMTI -->
+          <div class="footer-social">
+            <a href="#" aria-label="Instagram HMTI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="5" />
+                <circle cx="12" cy="12" r="4" />
+                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" />
+              </svg></a>
+            <a href="#" aria-label="YouTube HMTI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2.5" y="5" width="19" height="14" rx="4" />
+                <path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" />
+              </svg></a>
+            <a href="#" aria-label="LinkedIn HMTI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <path d="M8 11v5M8 8v.01M12 16v-5M12 13c0-1.7 1-2 2-2s2 .8 2 2.3V16" />
+              </svg></a>
+          </div>
+        </div>
+
+        <nav class="footer-col" aria-label="Tautan footer">
+          <h4>Tautan</h4>
+          <ul class="footer-links">
+            <li><a href="#beranda">Beranda</a></li>
+            <li><a href="#kandidat">Kandidat</a></li>
+            <li><a href="#aktivitas">Aktivitas Pemilu</a></li>
+          </ul>
+        </nav>
+
+        <div class="footer-col">
+          <h4>Kontak</h4>
+          <!-- GANTI email dan nomor di bawah dengan kontak panitia yang sebenarnya -->
+          <ul class="footer-contact">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z" />
+                <circle cx="12" cy="10" r="2.5" />
+              </svg><span>Teknologi Informasi, Fakultas Teknik, Universitas Udayana, Kampus Bukit Jimbaran, Badung, Bali
+                80361</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="3" />
+                <path d="M4 7l8 6 8-6" />
+              </svg><a href="mailto:hmti@example.com">hmti@example.com</a></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z" />
+              </svg><span>WhatsApp panitia: +62 8xx-xxxx-xxxx</span></li>
+          </ul>
+        </div>
       </div>
+
       <p class="footer-copy">&copy; <span id="footer-year">2026</span> HMTI. Seluruh hak dilindungi.</p>
     </div>
   </footer>
@@ -171,7 +256,6 @@
           <div class="vote-summary-number" id="vote-number">01</div>
           <div>
             <p class="vote-summary-name" id="vote-ketua"></p>
-            <p class="vote-summary-name" id="vote-wakil"></p>
           </div>
         </div>
 

@@ -68,6 +68,7 @@ async function loadPending() {
     .select("*")
     .eq("role", "mahasiswa")
     .eq("status", "pending")
+    .not("email", "is", null) // abaikan data hasil "Tambah Siswa" yang belum mendaftar akun
     .order("created_at", { ascending: true });
 
   if (error) {

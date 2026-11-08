@@ -165,7 +165,7 @@ function kandidatCardHtml(k) {
 
   const foto = k.foto_path
     ? `<img src="${escapeAttr(fotoUrl(k.foto_path))}"
-            alt="Foto paslon nomor ${nomor}: ${escapeAttr(k.nama_ketua)} dan ${escapeAttr(k.nama_wakil)}"
+            alt="Foto kandidat nomor ${nomor}: ${escapeAttr(k.nama_ketua)}"
             loading="lazy" decoding="async" />`
     : `<div class="kandidat-photo-empty" aria-hidden="true">${personIcon()}</div>`;
 
@@ -192,8 +192,6 @@ function kandidatCardHtml(k) {
       <div class="kandidat-body">
         <p class="kandidat-role">Calon Ketua</p>
         <h3 class="kandidat-name">${escapeHtml(k.nama_ketua)}</h3>
-        <p class="kandidat-role">Calon Wakil Ketua</p>
-        <h3 class="kandidat-name">${escapeHtml(k.nama_wakil)}</h3>
 
         <div class="kandidat-section">
           <h4>Visi</h4>
@@ -249,7 +247,6 @@ function openForm(kandidat, triggerEl) {
     submitBtn.textContent = "Simpan Perubahan";
     document.getElementById("f-nomor").value = editingKandidat.nomor_paslon;
     document.getElementById("f-ketua").value = editingKandidat.nama_ketua;
-    document.getElementById("f-wakil").value = editingKandidat.nama_wakil;
     document.getElementById("f-visi").value = editingKandidat.visi;
     document.getElementById("f-misi").value = editingKandidat.misi;
     document.getElementById("f-catatan").value = editingKandidat.catatan_tambahan || "";
@@ -361,7 +358,6 @@ formEl.addEventListener("submit", async (e) => {
   const payload = {
     nomor_paslon: nomor,
     nama_ketua: document.getElementById("f-ketua").value.trim(),
-    nama_wakil: document.getElementById("f-wakil").value.trim(),
     visi: document.getElementById("f-visi").value.trim(),
     misi: document.getElementById("f-misi").value.trim(),
     catatan_tambahan: document.getElementById("f-catatan").value.trim() || null,
@@ -370,8 +366,8 @@ formEl.addEventListener("submit", async (e) => {
   if (!Number.isInteger(nomor) || nomor < 1) {
     return showFormError("Nomor paslon harus berupa angka bulat minimal 1.");
   }
-  if (!payload.nama_ketua || !payload.nama_wakil || !payload.visi || !payload.misi) {
-    return showFormError("Nama ketua, nama wakil, visi, dan misi wajib diisi.");
+  if (!payload.nama_ketua || !payload.visi || !payload.misi) {
+    return showFormError("Nama ketua, visi, dan misi wajib diisi.");
   }
 
   const isEdit = editingKandidat !== null;
@@ -450,7 +446,7 @@ function openDelete(kandidat, triggerEl) {
   lastFocusedEl = triggerEl;
 
   deleteTextEl.textContent =
-    `Kandidat nomor ${kandidat.nomor_paslon} (${kandidat.nama_ketua} & ${kandidat.nama_wakil}) ` +
+    `Kandidat nomor ${kandidat.nomor_paslon} (${kandidat.nama_ketua}) ` +
     `akan dihapus permanen beserta fotonya. Tindakan ini tidak dapat dibatalkan.`;
   deleteErrorEl.className = "status-msg error hidden";
   deleteConfirmBtn.disabled = false;
@@ -491,11 +487,10 @@ deleteConfirmBtn.addEventListener("click", async () => {
   if (error || !data || data.length === 0) {
     let message = "Kandidat tidak terhapus. Pastikan Anda login sebagai admin.";
     if (error) {
-      // 23503 = foreign_key_violation (kandidat sudah punya suara di tb_suara)
-      message =
-        error.code === "23503"
-          ? "Kandidat ini sudah menerima suara sehingga tidak dapat dihapus."
-          : error.message;
+      // Kandidat yang sudah pernah dipilih tetap aman dihapus di sini: suara dicatat
+      // anonim di tb_antrian_suara / blockchain, tidak lagi lewat foreign key ke tb_kandidat
+      // (tb_suara, yang dulu punya foreign key itu, sudah dihapus dari skema).
+      message = error.message;
     }
     deleteErrorEl.textContent = message;
     deleteErrorEl.className = "status-msg error";

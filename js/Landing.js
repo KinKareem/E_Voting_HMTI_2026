@@ -66,7 +66,6 @@ const el = {
   viewSuccess: document.getElementById("vote-view-success"),
   voteNumber: document.getElementById("vote-number"),
   voteKetua: document.getElementById("vote-ketua"),
-  voteWakil: document.getElementById("vote-wakil"),
   voteError: document.getElementById("vote-error"),
   btnCancel: document.getElementById("vote-cancel"),
   btnConfirm: document.getElementById("vote-confirm"),
@@ -257,7 +256,7 @@ function kandidatCardHtml(k) {
 
   const foto = k.foto_path
     ? `<img src="${escapeAttr(fotoUrl(k.foto_path))}"
-            alt="Foto paslon nomor ${nomor}: ${escapeAttr(k.nama_ketua)} dan ${escapeAttr(k.nama_wakil)}"
+            alt="Foto kandidat nomor ${nomor}: ${escapeAttr(k.nama_ketua)}"
             loading="lazy" decoding="async" />`
     : `<div class="kandidat-photo-empty" aria-hidden="true">${personIcon()}</div>`;
 
@@ -284,8 +283,6 @@ function kandidatCardHtml(k) {
       <div class="kandidat-body">
         <p class="kandidat-role">Calon Ketua</p>
         <h3 class="kandidat-name">${escapeHtml(k.nama_ketua)}</h3>
-        <p class="kandidat-role">Calon Wakil Ketua</p>
-        <h3 class="kandidat-name">${escapeHtml(k.nama_wakil)}</h3>
 
         <div class="kandidat-section">
           <h4>Visi</h4>
@@ -333,7 +330,6 @@ function openVoteModal(kandidat, triggerEl) {
 
   el.voteNumber.textContent = formatNomor(kandidat.nomor_paslon);
   el.voteKetua.textContent = `${kandidat.nama_ketua}`;
-  el.voteWakil.textContent = `${kandidat.nama_wakil}`;
 
   el.viewConfirm.classList.remove("hidden");
   el.viewSuccess.classList.add("hidden");
@@ -612,7 +608,7 @@ async function loadHasil() {
         <article class="hasil-card ${unggul ? "unggul" : ""}">
           <div class="hasil-nomor">${formatNomor(nomor)}</div>
           <div class="hasil-info">
-            <p class="hasil-nama">${k ? escapeHtml(k.nama_ketua) + " &amp; " + escapeHtml(k.nama_wakil) : "Paslon " + formatNomor(nomor)}</p>
+            <p class="hasil-nama">${k ? escapeHtml(k.nama_ketua) : "Paslon " + formatNomor(nomor)}</p>
             <div class="hasil-bar" aria-hidden="true"><span style="width:${persen.toFixed(1)}%"></span></div>
             <p class="hasil-angka"><strong>${jumlah}</strong> suara &middot; ${persen.toFixed(1)}%${unggul ? " &middot; suara terbanyak" : ""}</p>
           </div>

@@ -128,6 +128,7 @@ const el = {
   note: byId("tx-note"),
   result: byId("tx-result"),
   btnAbort: byId("tx-abort"),
+  btnRetry: byId("tx-retry"),
   btnClose2: byId("tx-close"),
 };
 
@@ -227,6 +228,12 @@ const DEFAULT_RELAYER_HINT =
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Batas waktu menunggu konfirmasi transaksi di tahap "chain" sebelum popup berhenti
+// menunggu diam-diam dan menawarkan "Coba Muat Ulang Status". Transaksi yang sudah
+// terkirim TETAP bisa terkonfirmasi setelah batas ini lewat; ini hanya menghentikan
+// popup dari menunggu tanpa batas kalau jaringan admin macet/putus.
+const TX_CONFIRM_TIMEOUT_MS = 150_000; // 2.5 menit
+
 // ---------------------------------------------------------
 // Inisialisasi & pemuatan data
 // ---------------------------------------------------------
@@ -304,7 +311,7 @@ async function loadDb() {
 async function loadKandidatDb() {
   const { data, error } = await sb
     .from("tb_kandidat")
-    .select("nomor_paslon, nama_ketua, nama_wakil")
+    .select("nomor_paslon, nama_ketua")
     .order("nomor_paslon", { ascending: true });
   kandidatDb = error ? null : data || [];
 }
@@ -655,7 +662,7 @@ function renderResults() {
 
     const cells = [
       String(nomor).padStart(2, "0"),
-      k ? `${k.nama_ketua} & ${k.nama_wakil}` : "(data kandidat tidak ditemukan)",
+      k ? k.nama_ketua : "(data kandidat tidak ditemukan)",
       String(jumlah),
       `${persen}%`,
     ];
@@ -875,6 +882,8 @@ function showProgress(cfg) {
   el.btnClose2.classList.add("hidden");
   el.btnAbort.classList.add("hidden");
   el.btnAbort.disabled = false;
+  el.btnRetry.classList.add("hidden");
+  pendingWatch = null;
   setNote("");
   renderSteps(cfg.steps);
   currentStep = null;
@@ -963,6 +972,138 @@ async function handleAbort() {
   }
 }
 
+// Transaksi yang sudah terkirim tapi melewati TX_CONFIRM_TIMEOUT_MS tanpa konfirmasi.
+// Disimpan di sini supaya tombol "Coba Muat Ulang Status" tahu apa yang mau diperiksa.
+let pendingWatch = null; // { action, cfg, txHash } | null
+
+// Balapan antara tx.wait() dan batas waktu. Kalau batas waktu menang, tx.wait() TIDAK
+// dibatalkan; ia tetap berjalan di latar belakang (hasilnya diabaikan di sini, supaya
+// tidak pernah menjadi unhandled rejection), dan transaksinya tetap bisa terkonfirmasi
+// nanti. Pemeriksaannya sendiri dilakukan lewat getTransactionReceipt di checkPendingStatus.
+async function waitForConfirmation(tx, timeoutMs) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ timedOut: true }), timeoutMs);
+  });
+  const wait = tx
+    .wait()
+    .then((receipt) => ({ timedOut: false, receipt }))
+    .catch((error) => ({ timedOut: false, error }));
+
+  const result = await Promise.race([wait, timeout]);
+  clearTimeout(timer);
+  if (result.error) throw result.error;
+  return result;
+}
+
+// Tahap setelah transaksi terkonfirmasi (sama untuk alur normal maupun setelah
+// "Coba Muat Ulang Status" menemukan konfirmasinya): baca status terbaru dari
+// blockchain, simpan salinannya ke database (buka/tutup sesi), lalu tampilkan hasil.
+async function finalizeSuccess(action, cfg, txHash) {
+  const state = await readBack(cfg);
+  chainState = state;
+  chainError = null;
+
+  if (cfg.steps.includes("db")) {
+    setStep("db", "active");
+    dbState = await syncDatabase(state, txHash, action);
+    syncError = null;
+    setStep("db", "done");
+  }
+
+  busy = false;
+  pendingWatch = null;
+  el.btnRetry.classList.add("hidden");
+  render();
+  showResult("success", cfg.success, txHash);
+  showToast("success", cfg.success);
+
+  if (action === "relayer") el.relayerInput.value = "";
+  loadLive()
+    .then(render)
+    .catch(() => { });
+}
+
+// Popup berhenti menunggu tanpa batas: tampilkan status "menunggu konfirmasi" yang BISA
+// ditutup, dengan tombol untuk memeriksa ulang kapan saja.
+function enterPendingState(action, cfg, txHash) {
+  busy = false;
+  pendingWatch = { action, cfg, txHash };
+
+  const menit = Math.round(TX_CONFIRM_TIMEOUT_MS / 60000);
+  showResult(
+    "info",
+    `Belum ada konfirmasi dari jaringan setelah ${menit} menit. Transaksi mungkin masih diproses` +
+    ` (terutama jika koneksi Anda sempat terputus). Jendela ini sekarang bisa ditutup. Klik` +
+    ` "Coba Muat Ulang Status" kapan saja untuk memeriksa, atau tutup dan periksa lagi nanti lewat` +
+    ` tombol "Muat ulang" di halaman ini.`,
+    txHash
+  );
+  el.btnRetry.classList.remove("hidden");
+  el.btnRetry.disabled = false;
+  el.btnRetry.textContent = "Coba Muat Ulang Status";
+  render();
+}
+
+// Tombol "Coba Muat Ulang Status": cek sekali ke blockchain lewat getTransactionReceipt
+// (bukan tx.wait() lagi, supaya tidak menunggu tanpa batas untuk kedua kalinya).
+async function checkPendingStatus() {
+  if (!pendingWatch || !wallet) return;
+  const { action, cfg, txHash } = pendingWatch;
+
+  el.btnRetry.disabled = true;
+  el.btnRetry.textContent = "Memeriksa...";
+  setNote("Memeriksa status transaksi di blockchain...");
+
+  try {
+    const receipt = await wallet.provider.getTransactionReceipt(txHash);
+
+    if (!receipt) {
+      setNote('Transaksi masih belum terkonfirmasi. Tunggu sebentar lalu coba lagi.');
+      el.btnRetry.disabled = false;
+      el.btnRetry.textContent = "Coba Muat Ulang Status";
+      return;
+    }
+
+    setNote("");
+    el.btnRetry.classList.add("hidden");
+
+    if (receipt.status !== 1) {
+      pendingWatch = null;
+      busy = false;
+      render();
+      showResult("error", "Transaksi ditolak jaringan (gagal/revert). Coba ulangi aksinya dari awal.", txHash);
+      return;
+    }
+
+    busy = true; // kunci modal lagi selama tahap sisanya (db, dst) diproses
+    render();
+    setStep("chain", "done");
+    currentStep = null;
+
+    try {
+      await finalizeSuccess(action, cfg, txHash);
+    } catch (e) {
+      busy = false;
+      const d = describeChainError(e);
+      let message = d.message;
+      if (currentStep === "db") {
+        message = `Transaksi berhasil di blockchain, tetapi database gagal diperbarui: ${e.message} Muat ulang halaman ini; sinkronisasi dilakukan otomatis.`;
+      }
+      pendingWatch = { action, cfg, txHash }; // tetap bisa dicoba lagi
+      render();
+      showResult(d.type === "info" ? "info" : "error", message, txHash);
+      el.btnRetry.classList.remove("hidden");
+      el.btnRetry.disabled = false;
+      el.btnRetry.textContent = "Coba Muat Ulang Status";
+    }
+  } catch (e) {
+    setNote(`Gagal memeriksa status: ${e.message}`);
+    el.btnRetry.disabled = false;
+    el.btnRetry.textContent = "Coba Muat Ulang Status";
+  }
+}
+
 async function runAction() {
   if (busy || !pendingAction || !wallet) return;
   const action = pendingAction;
@@ -989,35 +1130,22 @@ async function runAction() {
     txHash = tx.hash;
     setStep("wallet", "done");
 
-    // 3) Tunggu terkonfirmasi di jaringan
+    // 3) Tunggu terkonfirmasi di jaringan, maksimal TX_CONFIRM_TIMEOUT_MS. Kalau lewat batas
+    //    ini (mis. koneksi admin macet), berhenti MENUNGGU, bukan membatalkan transaksinya.
     setStep("chain", "active");
-    const receipt = await tx.wait();
-    if (!receipt || receipt.status !== 1) throw new Error("Transaksi gagal di blockchain.");
+    const outcome = await waitForConfirmation(tx, TX_CONFIRM_TIMEOUT_MS);
+
+    if (outcome.timedOut) {
+      enterPendingState(action, cfg, txHash);
+      return;
+    }
+
+    if (!outcome.receipt || outcome.receipt.status !== 1) throw new Error("Transaksi gagal di blockchain.");
     setStep("chain", "done");
     currentStep = null; // transaksi sudah sah di blockchain; kegagalan berikutnya bukan kegagalan tahap ini
 
-    // 4) Baca status terbaru
-    const state = await readBack(cfg);
-    chainState = state;
-    chainError = null;
-
-    // 5) Simpan salinan ke database (hanya untuk buka/tutup sesi)
-    if (cfg.steps.includes("db")) {
-      setStep("db", "active");
-      dbState = await syncDatabase(state, txHash, action);
-      syncError = null;
-      setStep("db", "done");
-    }
-
-    busy = false;
-    render();
-    showResult("success", cfg.success, txHash);
-    showToast("success", cfg.success);
-
-    if (action === "relayer") el.relayerInput.value = "";
-    loadLive()
-      .then(render)
-      .catch(() => { });
+    // 4) Baca status terbaru + 5) simpan salinan ke database (hanya untuk buka/tutup sesi)
+    await finalizeSuccess(action, cfg, txHash);
   } catch (e) {
     busy = false;
 
@@ -1084,6 +1212,7 @@ el.btnAbort.addEventListener("click", () => {
   el.btnAbort.disabled = true;
   setNote("Membatalkan penutupan...");
 });
+el.btnRetry.addEventListener("click", checkPendingStatus);
 
 // Klik di luar kotak = batal (hanya saat belum memproses)
 el.overlay.addEventListener("click", (e) => {
