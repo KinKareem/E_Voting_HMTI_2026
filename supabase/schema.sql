@@ -35,8 +35,7 @@ rename to tb_pengguna_nim_idx;
 -- ---------------------------------------------------------
 -- 1. TABEL
 -- ---------------------------------------------------------
--- Pengguna (mahasiswa & admin). id = id akun di auth.users (Supabase Auth); mahasiswa yang
--- baru ditambahkan admin lewat "Tambah Siswa" belum punya akun, jadi emailnya masih kosong.
+-- Pengguna (mahasiswa & admin). id = id akun di auth.users (Supabase Auth).
 create table if not exists public.tb_pengguna (
   id uuid primary key default gen_random_uuid(),
   nim text not null unique,
@@ -52,10 +51,9 @@ create table if not exists public.tb_pengguna (
 create index if not exists tb_pengguna_role_status_idx on public.tb_pengguna (role, status);
 create index if not exists tb_pengguna_nim_idx on public.tb_pengguna (nim);
 -- ---------------------------------------------------------
--- Data mahasiswa dari menu "Tambah Siswa" disimpan langsung di tb_pengguna
--- (tabel tb_mahasiswa sudah tidak dipakai). Mahasiswa yang baru ditambahkan admin
--- belum punya akun login: barisnya berstatus 'pending' dengan email kosong, lalu
--- "diambil alih" saat mahasiswa itu mendaftar (fn_daftar_mahasiswa).
+-- Data mahasiswa disimpan langsung di tb_pengguna (tabel tb_mahasiswa sudah tidak dipakai).
+-- Baris tanpa akun login berstatus 'pending' dengan email kosong, lalu "diambil alih"
+-- saat mahasiswa itu mendaftar (fn_daftar_mahasiswa).
 -- Blok ini aman dijalankan berulang.
 -- ---------------------------------------------------------
 -- id tidak lagi harus sama dengan id di auth.users (baris belum punya akun login).
@@ -255,8 +253,7 @@ from public;
 grant execute on function public.get_email_by_nim(text) to anon,
   authenticated;
 -- Pendaftaran mahasiswa: mengaitkan akun login yang baru dibuat dengan baris tb_pengguna
--- hasil "Tambah Siswa" (berdasarkan NIM). Jika NIM belum pernah ditambahkan admin,
--- dibuat baris baru. Status tetap 'pending' sampai admin menyetujui.
+-- yang sudah ada (berdasarkan NIM). Jika NIM belum ada, dibuat baris baru. Status tetap 'pending' sampai admin menyetujui.
 create or replace function public.fn_daftar_mahasiswa(p_nim text, p_nama text, p_email text) returns text language plpgsql security definer
 set search_path = public as $$
 declare v_uid uuid := auth.uid();
@@ -638,16 +635,8 @@ create policy "tb_pengguna: admin baca semua" on public.tb_pengguna for
 select using (public.is_admin());
 create policy "tb_pengguna: admin ubah semua" on public.tb_pengguna for
 update using (public.is_admin());
--- Admin menambah data mahasiswa (menu "Tambah Siswa"): baris belum punya akun login.
+-- Policy lama untuk fitur "Tambah Siswa" (sudah dihapus); baris ini membersihkannya dari database.
 drop policy if exists "tb_pengguna: admin tambah data mahasiswa" on public.tb_pengguna;
-create policy "tb_pengguna: admin tambah data mahasiswa" on public.tb_pengguna for
-insert with check (
-    public.is_admin()
-    and role = ' mahasiswa '
-    and status = ' pending '
-    and has_voted = false
-    and email is null
-  );
 -- tb_kandidat: semua user yang login boleh melihat, hanya admin yang menambah.
 create policy "tb_kandidat: user login baca" on public.tb_kandidat for
 select to authenticated using (true);

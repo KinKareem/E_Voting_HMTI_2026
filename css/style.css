@@ -775,75 +775,6 @@ table.data-table td.muted {
   font-size: 13px;
 }
 
-/* Upload CSV */
-.upload-card {
-  background: #fff;
-  border: 1px solid var(--border-soft);
-  border-radius: 18px;
-  padding: 24px;
-  margin-bottom: 24px;
-}
-
-.upload-card-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.upload-format {
-  font-family: monospace;
-  font-size: 12px;
-  color: var(--bark-700);
-  margin-top: 4px;
-}
-
-.dropzone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  border: 2px dashed var(--border-soft);
-  border-radius: 14px;
-  background: rgba(250, 246, 239, 0.6);
-  padding: 40px 20px;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.dropzone:hover {
-  border-color: var(--gold-500);
-}
-
-.dropzone .dz-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--bark-900);
-}
-
-.dropzone .dz-subtitle {
-  font-size: 12px;
-  color: var(--bark-700);
-  margin-top: 4px;
-}
-
-.preview-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.preview-note {
-  padding: 12px 20px;
-  font-size: 12px;
-  color: var(--bark-700);
-}
-
 /* =========================================================
    RESPONSIVE
    ========================================================= */
@@ -1938,7 +1869,6 @@ tr.row-top td {
 }
 
 .table-card,
-.upload-card,
 .panel {
   background: #fff;
   border: 1px solid var(--line);
@@ -2044,18 +1974,6 @@ table.data-table tbody tr:not(.row-top):hover td {
   background: #fff;
   border-color: var(--amber);
   box-shadow: 0 0 0 4px rgba(226, 152, 58, .18)
-}
-
-.dropzone {
-  border: 2px dashed rgba(226, 152, 58, .55);
-  background: rgba(226, 152, 58, .05);
-  border-radius: 16px;
-  transition: background .2s, border-color .2s
-}
-
-.dropzone:hover {
-  background: rgba(226, 152, 58, .12);
-  border-color: var(--amber)
 }
 
 .modal-overlay {

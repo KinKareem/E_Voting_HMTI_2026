@@ -7,7 +7,6 @@ const MENU_ITEMS = [
   { href: "kandidat.html", label: "Kandidat" },
   { href: "sesi-voting.html", label: "Sesi Voting" },
   { href: "list-voting.html", label: "List Voting" },
-  { href: "tambah-siswa.html", label: "Tambah Siswa" },
 ];
 
 function renderSidebar() {
@@ -112,10 +111,7 @@ function iconFor(href) {
       <path d="M3 6h.01M3 12h.01M3 18h.01" stroke-linecap="round" />
     </svg>`;
   }
-  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-    <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round" />
-    <path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke-linecap="round" stroke-linejoin="round" />
-  </svg>`;
+  return "";
 }
 
 async function guardAdmin() {

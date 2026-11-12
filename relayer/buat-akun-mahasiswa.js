@@ -2,7 +2,7 @@
 // Membuat akun login mahasiswa langsung dari CSV (NIM, nama, password).
 // Dijalankan oleh panitia di komputer sendiri, TIDAK pernah lewat browser,
 // karena membuat akun Supabase Auth untuk orang lain butuh SUPABASE_SERVICE_ROLE_KEY
-// (kunci admin penuh) yang tidak boleh ada di kode sisi klien (Tambahsiswa.js).
+// (kunci admin penuh) yang tidak boleh ada di kode sisi klien (browser).
 //
 // Dibuat dengan status langsung "approved": mahasiswa TIDAK perlu mendaftar sendiri
 // atau menunggu Konfirmasi Pendaftaran lagi, cukup diberi NIM + password dari CSV ini.
@@ -184,7 +184,7 @@ async function main() {
 
     if (errSimpan) {
       // Akun login sudah terlanjur dibuat; hapus lagi supaya tidak jadi akun "yatim" tanpa profil.
-      await sb.auth.admin.deleteUser(akunBaru.user.id).catch(() => {});
+      await sb.auth.admin.deleteUser(akunBaru.user.id).catch(() => { });
       gagal.push(`${r.nim}: gagal menyimpan profil (${errSimpan.message})`);
       continue;
     }

@@ -21,8 +21,8 @@ const Auth = {
       };
     }
 
-    // Mengaitkan akun login dengan baris mahasiswa di tb_pengguna (data dari menu Tambah Siswa),
-    // atau membuat baris baru bila NIM belum pernah ditambahkan admin (lihat fn_daftar_mahasiswa).
+    // Mengaitkan akun login dengan baris mahasiswa di tb_pengguna yang sudah ada,
+    // atau membuat baris baru bila NIM belum ada (lihat fn_daftar_mahasiswa).
     const { error: profileError } = await sb.rpc("fn_daftar_mahasiswa", {
       p_nim: nim,
       p_nama: namaLengkap,
