@@ -1,0 +1,16 @@
+PS D:\TUGAS UNIVERSITAS\Tugas Akhir (skripsi)\APLIKASI TA\E_Voting_HMTI_2026> npx supabase functions deploy relayer --no-verify-jwt
+Target: project E-Voting HMTI (cjmxejabrqgqqwjadctt) · production
+Functions to deploy:
+ • relayer
+│
+◇  Deploy 1 Function on project E-Voting HMTI (cjmxejabrqgqqwjadctt) ·
+│   production?
+│  Yes
+WARNING: Docker is not running
+Uploading asset (relayer): supabase/functions/relayer/index.ts
+Deployed Functions on project cjmxejabrqgqqwjadctt: relayer
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/cjmxejabrqgqqwjadctt/functions
+
+
+PS D:\TUGAS UNIVERSITAS\Tugas Akhir (skripsi)\APLIKASI TA\E_Voting_HMTI_2026> $rahasia = "7eab8b1adf45354bd03f80a30499f0361e4ccbb22c521df95f8387d1da80c864"
+>> Invoke-RestMethod -Method Post -Uri "https://cjmxejabrqgqqwjadctt.supabase.co/functions/v1/relayer" -Headers @{ "x-relayer-secret" = $rahasia } -ContentType"application/json" -Body '{"aksi":"cek"}'

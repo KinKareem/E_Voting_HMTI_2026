@@ -462,6 +462,9 @@ function renderLogMessage(text) {
 // Riwayat dibaca langsung dari kontrak lewat RPC publik, BUKAN dari database aplikasi,
 // sehingga tidak bisa diubah-ubah oleh pengelola server.
 async function loadLog() {
+  // Alamat kontrak aktif diatur admin di database; muat ulang tiap pembaruan supaya halaman
+  // yang sedang terbuka ikut berpindah ke kontrak baru saat pemilihan baru dimulai.
+  await muatAlamatKontrak();
   const problem = blockchainConfigProblem();
   if (problem) {
     lastLogSignature = "tidak-dikonfigurasi";

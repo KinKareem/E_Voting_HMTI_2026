@@ -14,10 +14,11 @@
 const CHAIN_STATUS_KEYS = { 0: "belum_mulai", 1: "berlangsung", 2: "selesai" };
 
 // Mengembalikan kode masalah konfigurasi, atau null jika semuanya siap dipakai:
-//   "no_file" | "no_ethers" | "no_address" | "bad_address"
+//   "no_file" | "no_ethers" | "db_error" | "no_address" | "bad_address"
 function blockchainConfigCode() {
   if (typeof BLOCKCHAIN === "undefined" || typeof VOTING_SESSION_ABI === "undefined") return "no_file";
   if (typeof ethers === "undefined") return "no_ethers";
+  if (BLOCKCHAIN.ADDRESS_ERROR) return "db_error";
   if (!BLOCKCHAIN.CONTRACT_ADDRESS) return "no_address";
   if (!ethers.isAddress(BLOCKCHAIN.CONTRACT_ADDRESS)) return "bad_address";
   return null;
@@ -28,9 +29,10 @@ function blockchainConfigProblem() {
   const messages = {
     no_file: "File js/Blockchainconfig.js tidak ditemukan atau gagal dimuat.",
     no_ethers: "Library ethers.js gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.",
+    db_error: `Alamat kontrak tidak dapat dibaca dari database: ${BLOCKCHAIN.ADDRESS_ERROR}`,
     no_address:
-      "Alamat kontrak belum diisi. Isi CONTRACT_ADDRESS di js/Blockchainconfig.js setelah mendeploy kontrak.",
-    bad_address: "Alamat kontrak di js/Blockchainconfig.js tidak valid.",
+      "Alamat kontrak belum diatur. Admin dapat mengaturnya di menu Sesi Voting (Kontrak Pemilihan) setelah mendeploy kontrak.",
+    bad_address: "Alamat kontrak yang tersimpan tidak valid. Admin dapat memperbaikinya di menu Sesi Voting (Kontrak Pemilihan).",
   };
   const code = blockchainConfigCode();
   return code ? messages[code] : null;
@@ -52,8 +54,9 @@ function getReadProvider() {
 }
 
 // runner = provider (untuk membaca) atau signer (untuk menulis)
-function getSessionContract(runner) {
-  return new ethers.Contract(BLOCKCHAIN.CONTRACT_ADDRESS, VOTING_SESSION_ABI, runner || getReadProvider());
+// alamat (opsional) = kontrak lain, mis. untuk memeriksa kontrak baru sebelum diterapkan.
+function getSessionContract(runner, alamat) {
+  return new ethers.Contract(alamat || BLOCKCHAIN.CONTRACT_ADDRESS, VOTING_SESSION_ABI, runner || getReadProvider());
 }
 
 // Membaca seluruh keadaan sesi dari kontrak.
@@ -134,7 +137,7 @@ function describeChainError(e) {
   if (code === "BAD_DATA" || (code === "CALL_EXCEPTION" && !e.revert)) {
     return {
       type: "error",
-      message: `Kontrak tidak ditemukan di alamat tersebut pada jaringan ${BLOCKCHAIN.CHAIN_NAME}. Periksa CONTRACT_ADDRESS dan CHAIN_ID di js/Blockchainconfig.js.`,
+      message: `Kontrak tidak ditemukan di alamat tersebut pada jaringan ${BLOCKCHAIN.CHAIN_NAME}. Periksa alamat kontrak (menu Sesi Voting > Kontrak Pemilihan) dan CHAIN_ID di js/Blockchainconfig.js.`,
     };
   }
   if (code === "NETWORK_ERROR" || code === "SERVER_ERROR" || code === "TIMEOUT") {

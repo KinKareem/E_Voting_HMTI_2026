@@ -2002,3 +2002,114 @@ table.data-table tbody tr:not(.row-top):hover td {
 .toast {
   border-radius: 14px
 }
+
+/* ---------- Kontrol relayer otomatis (halaman Sesi Voting) ---------- */
+.relayer-controls {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(62, 39, 35, 0.08);
+}
+
+.relayer-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.relayer-buttons .btn-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.relayer-controls .panel-note {
+  margin-top: 10px;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bark-800);
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: #c9c3bf;
+  transition: background 0.18s ease;
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease;
+}
+
+.switch input:checked+.switch-track {
+  background: #166534;
+}
+
+.switch input:checked+.switch-track::after {
+  transform: translateX(18px);
+}
+
+.switch input:focus-visible+.switch-track {
+  outline: 2px solid var(--gold-500);
+  outline-offset: 2px;
+}
+
+.switch input:disabled+.switch-track,
+.switch input:disabled~.switch-label {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---------- Kontrak pemilihan (halaman Sesi Voting) ---------- */
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bark-800);
+  cursor: pointer;
+}
+
+.check-row input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: var(--brown);
+}
+
+.check-row input:disabled+span {
+  opacity: 0.55;
+}
+
+#kontrak-input:disabled {
+  background: rgba(27, 28, 28, 0.04);
+  cursor: not-allowed;
+}

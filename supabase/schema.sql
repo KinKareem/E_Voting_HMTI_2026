@@ -221,6 +221,42 @@ create table if not exists public.tb_status_relayer (
 );
 insert into public.tb_status_relayer (id)
 values (1) on conflict (id) do nothing;
+-- Pengaturan & ingatan relayer otomatis (Edge Function "relayer"):
+--   aktif         : saklar dari halaman Sesi Voting (false = relayer dijeda)
+--   terakhir_coba : kapan relayer terakhir mencoba mengirim batch (untuk selang INTERVAL_MENIT)
+--   kunci_sampai  : kunci anti-tumpang-tindih antar siklus (lihat fn_ambil_kunci_relayer)
+alter table public.tb_status_relayer
+add column if not exists aktif boolean not null default true;
+alter table public.tb_status_relayer
+add column if not exists terakhir_coba timestamptz;
+alter table public.tb_status_relayer
+add column if not exists kunci_sampai timestamptz;
+-- Alamat kontrak VotingSession yang AKTIF. Disimpan di database supaya cukup diganti di satu
+-- tempat (menu Sesi Voting) setiap pemilihan baru; web dan relayer membacanya dari sini.
+-- Kosong (null) = belum diatur; web/relayer memakai nilai cadangan (Blockchainconfig.js / secret).
+create table if not exists public.tb_pengaturan_kontrak (
+  id integer primary key default 1 check (id = 1),
+  contract_address text check (
+    contract_address is null
+    or contract_address ~ '^0x[0-9a-fA-F]{40}$'
+  ),
+  diperbarui_pada timestamptz,
+  diperbarui_oleh uuid references public.tb_pengguna (id) on delete
+  set null
+);
+insert into public.tb_pengaturan_kontrak (id)
+values (1) on conflict (id) do nothing;
+-- Jejak perubahan alamat kontrak (hanya bertambah, ditulis oleh fn_set_kontrak).
+create table if not exists public.tb_riwayat_kontrak (
+  id uuid primary key default gen_random_uuid(),
+  contract_address text not null,
+  alamat_sebelumnya text,
+  data_direset boolean not null default false,
+  wallet_address text,
+  admin_id uuid references public.tb_pengguna (id) on delete
+  set null,
+    waktu timestamptz not null default now()
+);
 -- ---------------------------------------------------------
 -- 2. FUNGSI BANTU
 -- ---------------------------------------------------------
@@ -581,6 +617,151 @@ grant execute on function public.fn_lepas_kedaluwarsa(integer) to service_role;
 grant execute on function public.fn_ambil_batch_suara(uuid, integer, integer) to service_role;
 grant execute on function public.fn_tandai_batch_terkirim(uuid, text) to service_role;
 grant execute on function public.fn_lepas_batch(uuid) to service_role;
+-- ---- Relayer otomatis (Edge Function "relayer") ----
+-- Saklar relayer dari halaman admin. Hanya admin; tabelnya sendiri tidak bisa ditulis lewat RLS.
+create or replace function public.fn_set_relayer_aktif(p_aktif boolean) returns boolean language plpgsql security definer
+set search_path = public as $$ begin if not public.is_admin() then raise exception 'Hanya admin yang boleh mengubah pengaturan relayer.';
+end if;
+update public.tb_status_relayer
+set aktif = p_aktif
+where id = 1;
+return p_aktif;
+end;
+$$;
+-- Kunci anti-tumpang-tindih: satu siklus relayer pada satu waktu (penjadwal + tombol admin
+-- bisa terjadi bersamaan). Kunci kedaluwarsa sendiri setelah p_detik jika siklus mati di tengah jalan.
+create or replace function public.fn_ambil_kunci_relayer(p_detik integer) returns boolean language plpgsql security definer
+set search_path = public as $$
+declare v_baris integer;
+begin
+update public.tb_status_relayer
+set kunci_sampai = now() + make_interval(secs => greatest(p_detik, 1))
+where id = 1
+  and (
+    kunci_sampai is null
+    or kunci_sampai < now()
+  );
+get diagnostics v_baris = row_count;
+return v_baris = 1;
+end;
+$$;
+create or replace function public.fn_lepas_kunci_relayer() returns void language plpgsql security definer
+set search_path = public as $$ begin
+update public.tb_status_relayer
+set kunci_sampai = null
+where id = 1;
+end;
+$$;
+revoke all on function public.fn_set_relayer_aktif(boolean)
+from public,
+  anon;
+grant execute on function public.fn_set_relayer_aktif(boolean) to authenticated;
+revoke all on function public.fn_ambil_kunci_relayer(integer)
+from public,
+  anon,
+  authenticated;
+revoke all on function public.fn_lepas_kunci_relayer()
+from public,
+  anon,
+  authenticated;
+grant execute on function public.fn_ambil_kunci_relayer(integer) to service_role;
+grant execute on function public.fn_lepas_kunci_relayer() to service_role;
+-- Pengetatan: fungsi-fungsi relayer hanya boleh dipanggil service_role. Di Supabase, role
+-- anon/authenticated bisa mendapat hak eksekusi otomatis, jadi dicabut eksplisit di sini.
+revoke all on function public.fn_lepas_kedaluwarsa(integer)
+from anon,
+  authenticated;
+revoke all on function public.fn_ambil_batch_suara(uuid, integer, integer)
+from anon,
+  authenticated;
+revoke all on function public.fn_tandai_batch_terkirim(uuid, text)
+from anon,
+  authenticated;
+revoke all on function public.fn_lepas_batch(uuid)
+from anon,
+  authenticated;
+-- ---- Kontrak dinamis (alamat kontrak diatur dari menu Sesi Voting) ----
+-- Mengganti alamat kontrak aktif. Dengan p_reset = true (pemilihan baru), data pemilihan lama
+-- dikosongkan dalam SATU transaksi yang sama: status sesi kembali 'belum_mulai', antrian suara
+-- dihapus, status "sudah memilih" direset, dan hitungan relayer dinolkan. Akun mahasiswa dan
+-- data kandidat tetap. Hanya admin, dan hanya saat sesi 'belum_mulai' atau 'selesai'.
+create or replace function public.fn_set_kontrak(
+    p_alamat text,
+    p_reset boolean default true,
+    p_wallet text default null
+  ) returns void language plpgsql security definer
+set search_path = public as $$
+declare v_status text;
+v_lama text;
+begin if not public.is_admin() then raise exception 'Hanya admin yang boleh mengganti kontrak.';
+end if;
+if p_alamat is null
+or p_alamat !~ '^0x[0-9a-fA-F]{40}$' then raise exception 'Alamat kontrak tidak valid (harus diawali 0x dan 42 karakter).';
+end if;
+select status into v_status
+from public.tb_sesi_voting
+where id = 1 for
+update;
+if v_status is null then raise exception 'Baris status sesi tidak ditemukan. Jalankan schema.sql terbaru.';
+end if;
+if v_status not in ('belum_mulai', 'selesai') then raise exception 'Kontrak tidak boleh diganti saat sesi voting sedang berlangsung atau ditutup.';
+end if;
+select contract_address into v_lama
+from public.tb_pengaturan_kontrak
+where id = 1;
+if p_reset then -- Penjaga transisi dimatikan sementara karena database sengaja menolak status mundur.
+-- Perintah ini ikut dibatalkan otomatis bila ada langkah di bawah yang gagal.
+alter table public.tb_sesi_voting disable trigger trg_jaga_transisi_sesi;
+update public.tb_sesi_voting
+set status = 'belum_mulai',
+  dibuka_pada = null,
+  dibuka_oleh = null,
+  dibuka_tx = null,
+  ditutup_pada = null,
+  ditutup_oleh = null,
+  ditutup_tx = null,
+  diperbarui_pada = now()
+where id = 1;
+alter table public.tb_sesi_voting enable trigger trg_jaga_transisi_sesi;
+delete from public.tb_antrian_suara;
+update public.tb_pengguna
+set has_voted = false
+where has_voted;
+update public.tb_status_relayer
+set total_terkirim = 0,
+  terakhir_kirim = null,
+  error_terakhir = null,
+  terakhir_coba = null
+where id = 1;
+end if;
+update public.tb_pengaturan_kontrak
+set contract_address = p_alamat,
+  diperbarui_pada = now(),
+  diperbarui_oleh = auth.uid()
+where id = 1;
+insert into public.tb_riwayat_kontrak (
+    contract_address,
+    alamat_sebelumnya,
+    data_direset,
+    wallet_address,
+    admin_id
+  )
+values (
+    p_alamat,
+    v_lama,
+    p_reset,
+    case
+      when p_wallet ~ '^0x[0-9a-fA-F]{40}$' then p_wallet
+      else null
+    end,
+    auth.uid()
+  );
+end;
+$$;
+revoke all on function public.fn_set_kontrak(text, boolean, text)
+from public,
+  anon;
+grant execute on function public.fn_set_kontrak(text, boolean, text) to authenticated;
 -- ---------------------------------------------------------
 -- 3. ROW LEVEL SECURITY
 -- ---------------------------------------------------------
@@ -656,6 +837,29 @@ update using (public.is_admin()) with check (public.is_admin());
 -- tb_status_relayer: hanya admin yang boleh melihat. Penulisnya relayer (service_role,
 -- tidak terkena RLS), jadi tidak ada policy tulis.
 create policy "tb_status_relayer: admin baca" on public.tb_status_relayer for
+select using (public.is_admin());
+-- Kontrak dinamis: alamat kontrak boleh dibaca siapa saja (publik di blockchain, dan halaman
+-- depan membutuhkannya); tidak ada policy tulis, jadi hanya fn_set_kontrak (admin) yang bisa mengubah.
+alter table public.tb_pengaturan_kontrak enable row level security;
+alter table public.tb_riwayat_kontrak enable row level security;
+revoke
+insert,
+  update,
+  delete on public.tb_pengaturan_kontrak
+from anon,
+  authenticated;
+revoke
+insert,
+  update,
+  delete on public.tb_riwayat_kontrak
+from anon,
+  authenticated;
+drop policy if exists "tb_pengaturan_kontrak: semua baca" on public.tb_pengaturan_kontrak;
+create policy "tb_pengaturan_kontrak: semua baca" on public.tb_pengaturan_kontrak for
+select to anon,
+  authenticated using (true);
+drop policy if exists "tb_riwayat_kontrak: admin baca" on public.tb_riwayat_kontrak;
+create policy "tb_riwayat_kontrak: admin baca" on public.tb_riwayat_kontrak for
 select using (public.is_admin());
 -- tb_log_admin: semua user yang login boleh melihat, hanya admin yang menambah.
 create policy "tb_log_admin: user login baca" on public.tb_log_admin for

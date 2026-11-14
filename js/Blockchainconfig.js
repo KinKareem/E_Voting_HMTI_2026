@@ -3,11 +3,14 @@
    Pengaturan koneksi ke blockchain. File ini yang Anda ubah
    setelah mendeploy kontrak (lihat blockchain/PANDUAN_DEPLOY.md).
 
-   WAJIB DIISI: CONTRACT_ADDRESS.
+   ALAMAT KONTRAK tidak lagi harus diedit di sini setiap pemilihan baru: admin
+   mengaturnya di menu Sesi Voting > Kontrak Pemilihan (disimpan di database).
+   CONTRACT_ADDRESS di bawah hanya CADANGAN, dipakai bila database belum mengaturnya.
    ========================================================= */
 
 const BLOCKCHAIN = {
-  // Alamat kontrak VotingSession hasil deploy, contoh: "0x1234...abcd"
+  // Alamat CADANGAN kontrak VotingSession, contoh: "0x1234...abcd". Alamat yang diatur
+  // admin di database selalu didahulukan (lihat muatAlamatKontrak di bawah).
   CONTRACT_ADDRESS: "0x991352F75B811Bb7A81d82C9259FE046DF3c9dE7",
 
   // Jaringan yang dipakai. Bawaan: Sepolia (jaringan uji, tanpa uang sungguhan).
@@ -61,3 +64,46 @@ const VOTING_SESSION_ABI = [
   "function voteCounted(bytes32) view returns (bool)",
   "function votesFor(uint8) view returns (uint256)",
 ];
+
+// ---------------------------------------------------------
+// Alamat kontrak aktif (dibaca dari database)
+// ---------------------------------------------------------
+// Alamat yang tertulis di file ini, disimpan sebagai cadangan.
+const ALAMAT_KONTRAK_FILE = BLOCKCHAIN.CONTRACT_ADDRESS;
+
+// Memuat alamat kontrak AKTIF dari tb_pengaturan_kontrak lalu menaruhnya di
+// BLOCKCHAIN.CONTRACT_ADDRESS. Panggil (dan tunggu) sebelum memakai kontrak.
+// Isi BLOCKCHAIN.ADDRESS_SOURCE sesudahnya:
+//   "database" : diatur admin di database (yang berlaku)
+//   "file"     : database belum mengaturnya (atau fiturnya belum dipasang); pakai cadangan di atas
+//   "none"     : tidak ada alamat sama sekali
+//   "error"    : database gagal dibaca. Alamat SENGAJA dikosongkan, bukan jatuh ke cadangan,
+//                supaya halaman tidak diam-diam menampilkan kontrak lama.
+async function muatAlamatKontrak() {
+  BLOCKCHAIN.ADDRESS_ERROR = null;
+  BLOCKCHAIN.ADDRESS_UPDATED_AT = null;
+  try {
+    const { data, error } = await sb
+      .from("tb_pengaturan_kontrak")
+      .select("contract_address, diperbarui_pada")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (error) {
+      // Tabel belum dibuat (patch_kontrak_dinamis.sql belum dijalankan): pakai cadangan
+      if (error.code !== "42P01" && error.code !== "PGRST205") throw new Error(error.message);
+    } else if (data && data.contract_address) {
+      BLOCKCHAIN.CONTRACT_ADDRESS = data.contract_address;
+      BLOCKCHAIN.ADDRESS_SOURCE = "database";
+      BLOCKCHAIN.ADDRESS_UPDATED_AT = data.diperbarui_pada;
+      return;
+    }
+
+    BLOCKCHAIN.CONTRACT_ADDRESS = ALAMAT_KONTRAK_FILE;
+    BLOCKCHAIN.ADDRESS_SOURCE = ALAMAT_KONTRAK_FILE ? "file" : "none";
+  } catch (e) {
+    BLOCKCHAIN.CONTRACT_ADDRESS = "";
+    BLOCKCHAIN.ADDRESS_SOURCE = "error";
+    BLOCKCHAIN.ADDRESS_ERROR = (e && e.message) || String(e);
+  }
+}

@@ -193,6 +193,24 @@ async function kirimBatch(ctx, batchId, rows) {
 // Satu siklus pemeriksaan
 // ---------------------------------------------------------
 async function siklus(ctx, opsi = {}) {
+  // 0. Alamat kontrak aktif menurut database (diatur admin di menu Sesi Voting, berubah saat
+  //    pemilihan baru). CONTRACT_ADDRESS di .env hanya cadangan bila database belum mengaturnya.
+  try {
+    const { data: kontrak, error } = await ctx.sb
+      .from("tb_pengaturan_kontrak")
+      .select("contract_address")
+      .eq("id", 1)
+      .maybeSingle();
+    const baru = !error && kontrak && kontrak.contract_address;
+    if (baru && baru.toLowerCase() !== ctx.cfg.contractAddress.toLowerCase()) {
+      log(`Alamat kontrak di database berubah: ${ctx.cfg.contractAddress} -> ${baru}`);
+      ctx.cfg.contractAddress = baru;
+      ctx.contract = new ethers.Contract(baru, ABI, ctx.wallet);
+    }
+  } catch (_) {
+    /* tabel belum ada atau database sulit dijangkau: tetap pakai alamat yang sedang dipakai */
+  }
+
   const { cfg, sb, wallet, contract, state } = ctx;
   const sekarang = Date.now();
   const hasil = (dikirim, galat, pesan) => ({ dikirim, galat: galat || null, pesan });
@@ -311,7 +329,7 @@ async function main() {
   if (st) ctx.state.totalTerkirim = st.total_terkirim || 0;
 
   let berhenti = false;
-  let bangunkan = () => {};
+  let bangunkan = () => { };
   const sinyal = new Promise((resolve) => {
     bangunkan = resolve;
   });

@@ -1,3 +1,5 @@
 node_modules/
 .env
 ZIP FILE/
+supabase/
+edge.env

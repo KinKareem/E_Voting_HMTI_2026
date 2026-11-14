@@ -141,6 +141,22 @@
             </div>
           </dl>
 
+          <div class="relayer-controls">
+            <label class="switch" for="relayer-toggle">
+              <input type="checkbox" id="relayer-toggle" checked disabled />
+              <span class="switch-track" aria-hidden="true"></span>
+              <span class="switch-label" id="relayer-toggle-label">Relayer otomatis aktif</span>
+            </label>
+            <div class="relayer-buttons">
+              <button type="button" class="btn-outline" id="btn-relayer-cek">Periksa relayer</button>
+              <button type="button" class="btn-outline" id="btn-relayer-kirim" disabled>Kirim sekarang</button>
+            </div>
+            <p class="panel-note" id="relayer-ctl-hint">
+              Relayer berjalan otomatis (dipanggil tiap menit) selama sesi voting berlangsung. Gunakan
+              saklar hanya jika perlu menjeda pengiriman suara ke blockchain.
+            </p>
+          </div>
+
           <div class="relayer-form">
             <label for="relayer-input" class="relayer-label">Ganti relayer</label>
             <div class="relayer-row">
@@ -154,6 +170,46 @@
               Gunakan jika wallet relayer lama hilang atau rusak. Hanya wallet pemilik kontrak yang
               bisa mengganti relayer.
             </p>
+          </div>
+        </section>
+
+        <!-- Kontrak pemilihan (alamat kontrak aktif & pemilihan baru) -->
+        <section class="panel panel-wide" id="kontrak-panel">
+          <h2 class="panel-title">Kontrak Pemilihan</h2>
+          <p class="panel-note panel-note-top">
+            Alamat kontrak aktif disimpan di database dan dipakai oleh halaman web serta relayer otomatis.
+            Untuk pemilihan baru, deploy kontrak baru (Remix), lalu tempel alamatnya di sini. Tidak perlu
+            mengedit file atau secret.
+          </p>
+
+          <dl class="detail-list">
+            <div>
+              <dt>Kontrak aktif</dt>
+              <dd id="kontrak-aktif" class="mono">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Sumber alamat</dt>
+              <dd id="kontrak-sumber">&mdash;</dd>
+            </div>
+            <div>
+              <dt>Terakhir diubah</dt>
+              <dd id="kontrak-diubah">&mdash;</dd>
+            </div>
+          </dl>
+
+          <div class="relayer-form">
+            <label for="kontrak-input" class="relayer-label">Alamat kontrak baru</label>
+            <div class="relayer-row">
+              <input type="text" id="kontrak-input" placeholder="0x... (alamat kontrak hasil deploy)" autocomplete="off"
+                spellcheck="false" disabled />
+              <button type="button" class="btn-outline" id="btn-set-kontrak" disabled>Terapkan</button>
+            </div>
+            <label class="check-row" for="kontrak-reset">
+              <input type="checkbox" id="kontrak-reset" checked />
+              <span>Pemilihan baru: kosongkan antrian suara dan status &ldquo;sudah memilih&rdquo; dari pemilihan
+                sebelumnya (akun mahasiswa dan data kandidat tetap)</span>
+            </label>
+            <p class="panel-note" id="kontrak-hint">&nbsp;</p>
           </div>
         </section>
 

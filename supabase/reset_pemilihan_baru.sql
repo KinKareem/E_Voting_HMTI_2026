@@ -1,5 +1,7 @@
 -- =========================================================
--- RESET UNTUK PEMILIHAN BARU
+-- RESET UNTUK PEMILIHAN BARU (cara manual)
+-- CATATAN: sekarang cukup memakai menu Sesi Voting > Kontrak Pemilihan, yang mengganti alamat
+-- kontrak DAN mereset data ini dalam satu langkah. Skrip ini tetap ada sebagai cadangan.
 -- Jalankan di Supabase -> SQL Editor, SETELAH mendeploy kontrak baru
 -- dan mengganti CONTRACT_ADDRESS (js/Blockchainconfig.js + relayer/.env).
 --

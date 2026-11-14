@@ -76,7 +76,8 @@ function showToast(type, message) {
 // ---------------------------------------------------------
 // Konstanta, elemen & state
 // ---------------------------------------------------------
-const RELAYER_STALE_MS = 90 * 1000; // relayer menulis detak jantung tiap ~20 detik
+const RELAYER_STALE_MS = 150 * 1000; // relayer otomatis dipanggil tiap menit; beri toleransi keterlambatan
+const RELAYER_FN_URL = `${SUPABASE_URL}/functions/v1/relayer`; // Edge Function relayer
 const LIVE_REFRESH_MS = 15 * 1000; // pembaruan otomatis ringkasan antrian & relayer
 const QUEUE_POLL_MS = 4000; // saat menunggu antrian kosong ketika menutup sesi
 
@@ -110,6 +111,18 @@ const el = {
   relayerInput: byId("relayer-input"),
   btnSetRelayer: byId("btn-set-relayer"),
   relayerHint: byId("relayer-hint"),
+  relayerToggle: byId("relayer-toggle"),
+  relayerToggleLabel: byId("relayer-toggle-label"),
+  btnRelayerCek: byId("btn-relayer-cek"),
+  btnRelayerKirim: byId("btn-relayer-kirim"),
+  relayerCtlHint: byId("relayer-ctl-hint"),
+  kontrakAktif: byId("kontrak-aktif"),
+  kontrakSumber: byId("kontrak-sumber"),
+  kontrakDiubah: byId("kontrak-diubah"),
+  kontrakInput: byId("kontrak-input"),
+  kontrakReset: byId("kontrak-reset"),
+  btnSetKontrak: byId("btn-set-kontrak"),
+  kontrakHint: byId("kontrak-hint"),
   resultsPanel: byId("results-panel"),
   resultsBody: byId("results-body"),
   resultsNote: byId("results-note"),
@@ -147,6 +160,12 @@ let busy = false; // true selama aksi diproses
 let pendingAction = null; // "open" | "close" | "relayer"
 let pendingNumbers = []; // nomor paslon yang akan dikunci saat membuka sesi
 let pendingRelayerAddress = null;
+let kontrakRow = null; // baris tb_pengaturan_kontrak (null = belum bisa dibaca)
+let kontrakFiturAktif = false; // false = patch_kontrak_dinamis.sql belum dijalankan
+let pendingKontrak = null; // { alamat, reset } yang akan diterapkan
+let liveStarted = false;
+let relayerBusy = false; // true selama saklar / tombol relayer diproses
+let relayerCtlMessage = ""; // pesan hasil aksi relayer terakhir (tampil di bawah tombol)
 let currentStep = null;
 let abortRequested = false;
 let lastFocusedEl = null;
@@ -161,6 +180,8 @@ const DB_LABEL = {
 };
 
 const STEP_LABEL = {
+  relayer: "Memeriksa relayer otomatis",
+  kontrak: "Memeriksa kontrak di blockchain",
   stop: "Menghentikan penerimaan suara baru",
   flush: "Mengirim sisa suara ke blockchain",
   wallet: "Konfirmasi di MetaMask",
@@ -175,6 +196,7 @@ const ACTIONS = {
     points: [
       "Mahasiswa yang sudah disetujui dapat langsung memberikan suara.",
       "Pembukaan sesi dicatat permanen bersama alamat wallet Anda dan waktunya.",
+      "Sebelum dibuka, relayer diperiksa dulu. Sesi tidak akan dibuka jika relayer belum siap, supaya suara tidak tertahan.",
       "Anda perlu mengonfirmasi transaksi di MetaMask dan membayar biaya gas.",
     ],
     warning: "Pastikan data kandidat sudah lengkap dan benar sebelum memulai.",
@@ -182,7 +204,7 @@ const ACTIONS = {
     confirmLabel: "Ya, Mulai Sesi",
     confirmClass: "btn-primary",
     progressTitle: "Membuka sesi voting",
-    steps: ["wallet", "chain", "db"],
+    steps: ["relayer", "wallet", "chain", "db"],
     confirmState: (s) => s.status === 1,
     success: "Sesi voting berhasil dibuka.",
   },
@@ -190,7 +212,7 @@ const ACTIONS = {
     title: "Tutup Sesi Voting?",
     text: "Anda akan menutup sesi pemilihan Ketua HMTI secara permanen.",
     points: [
-      "Penerimaan suara baru dihentikan, lalu semua sisa suara di antrian dikirim ke blockchain oleh relayer (relayer harus berjalan).",
+      "Penerimaan suara baru dihentikan, lalu semua sisa suara di antrian dikirim ke blockchain oleh relayer (relayer harus aktif dan tidak dijeda).",
       "Setelah antrian kosong, sesi ditutup di blockchain dan TIDAK dapat dibuka kembali.",
       "Mahasiswa tidak dapat lagi memberikan suara. Hasil akhir dapat dilihat semua orang.",
     ],
@@ -203,6 +225,19 @@ const ACTIONS = {
     confirmState: (s) => s.status === 2,
     success: "Sesi voting berhasil ditutup.",
   },
+  kontrak: {
+    title: "Terapkan Kontrak Pemilihan?",
+    text: "",
+    points: [],
+    warning: "",
+    danger: true,
+    confirmLabel: "Ya, Terapkan",
+    confirmClass: "btn-danger-solid",
+    progressTitle: "Menerapkan kontrak pemilihan",
+    steps: ["kontrak", "db"],
+    confirmState: () => true,
+    success: "Kontrak pemilihan berhasil diterapkan.",
+  },
   relayer: {
     title: "Ganti Relayer?",
     text: "",
@@ -212,7 +247,7 @@ const ACTIONS = {
       "Anda perlu mengonfirmasi transaksi di MetaMask dan membayar biaya gas.",
     ],
     warning:
-      "Pastikan Anda memegang private key alamat tersebut dan memperbarui file .env relayer. Jika salah alamat, suara tidak bisa terkirim sampai relayer diganti lagi.",
+      "Pastikan Anda memegang private key alamat tersebut dan memperbarui RELAYER_PRIVATE_KEY (secret Supabase untuk relayer otomatis, atau file .env untuk relayer manual). Jika salah alamat, suara tidak bisa terkirim sampai relayer diganti lagi.",
     danger: false,
     confirmLabel: "Ya, Ganti Relayer",
     confirmClass: "btn-primary",
@@ -222,6 +257,9 @@ const ACTIONS = {
     success: "Relayer berhasil diganti.",
   },
 };
+
+const DEFAULT_KONTRAK_HINT =
+  'Tempel alamat kontrak hasil deploy. Jika opsi di bawah dicentang, data pemilihan sebelumnya ikut dikosongkan (untuk pemilihan baru).';
 
 const DEFAULT_RELAYER_HINT =
   "Gunakan jika wallet relayer lama hilang atau rusak. Hanya wallet pemilik kontrak yang bisa mengganti relayer.";
@@ -237,22 +275,9 @@ const TX_CONFIRM_TIMEOUT_MS = 150_000; // 2.5 menit
 // ---------------------------------------------------------
 // Inisialisasi & pemuatan data
 // ---------------------------------------------------------
-async function init() {
-  el.networkInfo.textContent = `${BLOCKCHAIN.CHAIN_NAME} (ID ${BLOCKCHAIN.CHAIN_ID})`;
-  el.contractInfo.textContent = BLOCKCHAIN.CONTRACT_ADDRESS || "Belum diisi";
-
-  const problem = blockchainConfigProblem();
-  if (problem) {
-    el.configAlert.textContent = problem;
-    el.configAlert.className = "status-msg error";
-    chainError = problem;
-    render();
-    return;
-  }
-
-  await restoreWallet();
-  await loadAll();
-
+function startLiveRefresh() {
+  if (liveStarted) return;
+  liveStarted = true;
   // Pembaruan otomatis ringan (ringkasan antrian, detak relayer, status chain)
   setInterval(async () => {
     if (busy || document.hidden) return;
@@ -261,9 +286,31 @@ async function init() {
   }, LIVE_REFRESH_MS);
 }
 
+async function init() {
+  // Alamat kontrak aktif diatur admin di database; muat dulu sebelum memakai kontrak.
+  await muatAlamatKontrak();
+  el.networkInfo.textContent = `${BLOCKCHAIN.CHAIN_NAME} (ID ${BLOCKCHAIN.CHAIN_ID})`;
+  el.contractInfo.textContent = BLOCKCHAIN.CONTRACT_ADDRESS || "Belum diatur";
+
+  const problem = blockchainConfigProblem();
+  if (problem) {
+    el.configAlert.textContent = problem;
+    el.configAlert.className = "status-msg error";
+    chainError = problem;
+    // Tetap muat status database agar admin bisa mengatur alamat kontrak lewat panel Kontrak Pemilihan
+    await Promise.all([loadDb(), loadKontrakRow()]);
+    render();
+    return;
+  }
+
+  await restoreWallet();
+  await loadAll();
+  startLiveRefresh();
+}
+
 async function loadAll() {
   setBadge("loading", "Memuat...");
-  await Promise.all([loadDb(), loadKandidatDb()]);
+  await Promise.all([loadDb(), loadKandidatDb(), loadKontrakRow()]);
   await loadLive();
   await autoSync();
   render();
@@ -314,6 +361,12 @@ async function loadKandidatDb() {
     .select("nomor_paslon, nama_ketua")
     .order("nomor_paslon", { ascending: true });
   kandidatDb = error ? null : data || [];
+}
+
+async function loadKontrakRow() {
+  const { data, error } = await sb.from("tb_pengaturan_kontrak").select("*").eq("id", 1).maybeSingle();
+  kontrakFiturAktif = !error; // error = tabel belum dibuat (patch belum dijalankan)
+  kontrakRow = error ? null : data || null;
 }
 
 async function loadRelayerRow() {
@@ -448,6 +501,7 @@ function render() {
   el.hint.textContent = gate.hint;
 
   renderRelayerPanel();
+  renderKontrakPanel();
   renderResults();
 }
 
@@ -551,20 +605,45 @@ function renderWallet() {
   el.btnSwitch.classList.toggle("hidden", rightNetwork);
 }
 
-// Apakah relayer terlihat aktif? -> { state: "ok" | "bad" | "idle", text }
+// Apakah sesi voting di database sedang menerima suara / sedang ditutup?
+function sesiBerjalanDb() {
+  return !!dbState && (dbState.status === "berlangsung" || dbState.status === "menutup");
+}
+
+// Detak jantung relayer masih baru dan tanpa error?
+function heartbeatSegar() {
+  if (!relayerRow || !relayerRow.terakhir_aktif) return false;
+  const umur = Date.now() - new Date(relayerRow.terakhir_aktif).getTime();
+  return umur <= RELAYER_STALE_MS && !relayerRow.error_terakhir;
+}
+
+// Apakah relayer terlihat sehat? -> { state: "ok" | "bad" | "idle", text }
+// Relayer otomatis hanya dipanggil saat sesi berlangsung/menutup, jadi di luar itu detak
+// jantungnya wajar lama; statusnya "siaga", bukan "tidak aktif".
 function relayerHealth() {
   if (!relayerRow || !relayerRow.terakhir_aktif) {
-    return { state: "bad", text: "Belum pernah berjalan. Jalankan relayer (lihat relayer/PANDUAN_RELAYER.md)." };
+    return {
+      state: "bad",
+      text: 'Belum pernah diperiksa atau dijalankan. Klik "Periksa relayer" (panduan: supabase/PANDUAN_EDGE_FUNCTION.md).',
+    };
   }
   const umur = Date.now() - new Date(relayerRow.terakhir_aktif).getTime();
   const parts = [];
   let state = "ok";
 
-  if (umur > RELAYER_STALE_MS) {
+  if (relayerRow.aktif === false) {
     state = "bad";
-    parts.push(`Tidak aktif — terakhir terdeteksi ${relativeTime(relayerRow.terakhir_aktif)}`);
+    parts.push("DIJEDA — suara tidak dikirim ke blockchain sampai relayer dilanjutkan");
+  } else if (sesiBerjalanDb()) {
+    if (umur > RELAYER_STALE_MS) {
+      state = "bad";
+      parts.push(`Tidak aktif — terakhir terdeteksi ${relativeTime(relayerRow.terakhir_aktif)}`);
+    } else {
+      parts.push(`Aktif (terdeteksi ${relativeTime(relayerRow.terakhir_aktif)})`);
+    }
   } else {
-    parts.push(`Aktif (terdeteksi ${relativeTime(relayerRow.terakhir_aktif)})`);
+    state = "idle";
+    parts.push(`Siaga — aktif otomatis saat sesi berlangsung (pemeriksaan terakhir ${relativeTime(relayerRow.terakhir_aktif)})`);
   }
   if (relayerRow.terakhir_kirim) parts.push(`terakhir kirim ${relativeTime(relayerRow.terakhir_kirim)}`);
   if (relayerRow.alamat_relayer && chainState && !sameAddress(relayerRow.alamat_relayer, chainState.relayer)) {
@@ -616,6 +695,7 @@ function renderRelayerPanel() {
     el.verifyInfo.dataset.state = "bad";
   }
 
+  renderRelayerControls();
   renderRelayerForm();
 }
 
@@ -775,7 +855,8 @@ async function switchNetwork() {
 // Popup konfirmasi
 // ---------------------------------------------------------
 function openConfirm(action) {
-  const button = action === "open" ? el.btnOpen : action === "close" ? el.btnClose : el.btnSetRelayer;
+  const button =
+    action === "open" ? el.btnOpen : action === "close" ? el.btnClose : action === "kontrak" ? el.btnSetKontrak : el.btnSetRelayer;
   if (busy || button.disabled) return;
 
   const cfg = ACTIONS[action];
@@ -797,6 +878,28 @@ function openConfirm(action) {
 
   if (action === "close" && closingInProgress()) {
     text = "Penutupan sudah dimulai (penerimaan suara baru sudah dihentikan). Anda akan melanjutkannya.";
+  }
+
+  if (action === "kontrak") {
+    const alamat = ethers.getAddress(el.kontrakInput.value.trim());
+    const reset = el.kontrakReset.checked;
+    pendingKontrak = { alamat, reset };
+    text = `Anda akan mengatur ${alamat} sebagai kontrak pemilihan yang aktif.`;
+    points.length = 0;
+    points.push("Alamat ini dipakai halaman web (halaman depan dan Sesi Voting) dan relayer otomatis.");
+    if (reset) {
+      points.push(
+        "Data pemilihan sebelumnya dikosongkan: antrian suara dihapus, status \"sudah memilih\" semua mahasiswa direset, dan status sesi kembali ke \"Belum dimulai\". Akun mahasiswa dan data kandidat tetap.",
+        "Hasil di kontrak lama tetap tersimpan di blockchain, tetapi salinan antrian di database hilang. Simpan hasil pemilihan sebelumnya lebih dulu bila perlu."
+      );
+    } else {
+      points.push("Data pemilihan yang ada TIDAK diubah.");
+    }
+    points.push("Sebelum diterapkan, kontrak diperiksa di blockchain" + (reset ? " (harus ada dan statusnya masih \"Belum dimulai\")." : " (harus ada)."));
+    cfg.danger = reset;
+    cfg.confirmClass = reset ? "btn-danger-solid" : "btn-primary";
+    cfg.confirmLabel = reset ? "Ya, Terapkan dan Kosongkan Data" : "Ya, Terapkan Alamat";
+    cfg.warning = reset ? "Penghapusan data pemilihan lama tidak dapat dibatalkan." : "Pastikan alamat kontrak sudah benar.";
   }
 
   if (action === "relayer") {
@@ -914,6 +1017,294 @@ async function sleepAbortable(ms) {
   }
 }
 
+// ---------------------------------------------------------
+// Kontrak pemilihan (alamat kontrak aktif + pemilihan baru)
+// ---------------------------------------------------------
+function formatIso(iso) {
+  const d = new Date(iso);
+  const tanggal = d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Makassar" });
+  const jam = d
+    .toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Makassar" })
+    .replace(":", ".");
+  return `${tanggal}, ${jam} WITA`;
+}
+
+function renderKontrakPanel() {
+  const alamat = BLOCKCHAIN.CONTRACT_ADDRESS;
+  el.kontrakAktif.textContent = alamat || "Belum diatur";
+  el.contractInfo.textContent = alamat || "Belum diatur";
+
+  const sumber = BLOCKCHAIN.ADDRESS_SOURCE;
+  el.kontrakSumber.textContent =
+    sumber === "database"
+      ? "Database (diatur dari halaman ini)"
+      : sumber === "file"
+        ? "Cadangan dari js/Blockchainconfig.js (belum diatur di database)"
+        : sumber === "error"
+          ? `Gagal dibaca dari database: ${BLOCKCHAIN.ADDRESS_ERROR}`
+          : "Belum diatur";
+  el.kontrakDiubah.textContent = kontrakRow && kontrakRow.diperbarui_pada ? formatIso(kontrakRow.diperbarui_pada) : "—";
+
+  const nilai = el.kontrakInput.value.trim();
+  const status = dbState ? dbState.status : null;
+  const sesiAktif = status === "berlangsung" || status === "menutup";
+  const reset = el.kontrakReset.checked;
+
+  let hint = DEFAULT_KONTRAK_HINT;
+  let valid = false;
+  if (!kontrakFiturAktif) {
+    hint = "Fitur ini belum aktif: jalankan supabase/patch_kontrak_dinamis.sql di SQL Editor Supabase.";
+  } else if (!dbState) {
+    hint = "Memuat status sesi...";
+  } else if (sesiAktif) {
+    hint = "Alamat kontrak tidak dapat diganti saat sesi sedang berlangsung atau sedang ditutup.";
+  } else if (busy) {
+    hint = "Aksi sedang diproses...";
+  } else if (!nilai) {
+    hint = DEFAULT_KONTRAK_HINT;
+  } else if (!ethers.isAddress(nilai)) {
+    hint = "Alamat tidak valid. Periksa kembali (diawali 0x, 42 karakter).";
+  } else if (sameAddress(nilai, alamat) && !reset) {
+    hint = "Alamat ini sudah menjadi kontrak aktif.";
+  } else {
+    valid = true;
+    hint = reset
+      ? 'Alamat valid. Klik "Terapkan" untuk memulai pemilihan baru dengan kontrak ini (data pemilihan lama dikosongkan).'
+      : 'Alamat valid. Klik "Terapkan" untuk mengganti alamat kontrak tanpa mengubah data pemilihan.';
+  }
+
+  const terkunci = !kontrakFiturAktif || !dbState || sesiAktif || busy;
+  el.kontrakInput.disabled = terkunci;
+  el.kontrakReset.disabled = terkunci;
+  el.btnSetKontrak.disabled = !valid;
+  el.kontrakHint.textContent = hint;
+}
+
+// Memeriksa kontrak di blockchain SEBELUM diterapkan, supaya salah ketik tidak membuat
+// web dan relayer menunjuk ke alamat yang tidak ada.
+async function periksaKontrakBaru(alamat, reset) {
+  const provider = getReadProvider();
+  let kode;
+  try {
+    kode = await provider.getCode(alamat);
+  } catch (_) {
+    throw new Error("Tidak dapat menghubungi jaringan blockchain untuk memeriksa kontrak. Coba lagi beberapa saat lagi.");
+  }
+  if (!kode || kode === "0x") {
+    throw new Error(`Tidak ada kontrak di alamat itu pada jaringan ${BLOCKCHAIN.CHAIN_NAME}. Periksa alamat dan jaringannya.`);
+  }
+  let state;
+  try {
+    state = await readSessionState(getSessionContract(provider, alamat));
+  } catch (_) {
+    throw new Error("Alamat itu bukan kontrak VotingSession yang dikenali aplikasi ini.");
+  }
+  if (reset && state.status !== 0) {
+    throw new Error(
+      "Kontrak ini sudah dibuka atau ditutup. Untuk pemilihan baru, deploy kontrak baru yang statusnya masih \"Belum dimulai\"."
+    );
+  }
+  return state;
+}
+
+async function terapkanKontrak() {
+  const { alamat, reset } = pendingKontrak;
+
+  setStep("kontrak", "active");
+  const state = await periksaKontrakBaru(alamat, reset);
+  setStep("kontrak", "done");
+
+  setStep("db", "active");
+  const { error } = await sb.rpc("fn_set_kontrak", {
+    p_alamat: alamat,
+    p_reset: reset,
+    p_wallet: wallet ? wallet.address : null,
+  });
+  if (error) throw new Error(error.message);
+  setStep("db", "done");
+  currentStep = null;
+
+  // Mulai sekarang web memakai kontrak baru
+  BLOCKCHAIN.CONTRACT_ADDRESS = alamat;
+  BLOCKCHAIN.ADDRESS_SOURCE = "database";
+  BLOCKCHAIN.ADDRESS_ERROR = null;
+  chainState = null;
+  chainError = null;
+  chainResults = null;
+  syncError = null;
+  el.configAlert.className = "status-msg hidden";
+  el.configAlert.textContent = "";
+  el.kontrakInput.value = "";
+  pendingKontrak = null;
+
+  busy = false;
+  if (!liveStarted) {
+    await restoreWallet();
+    startLiveRefresh();
+  }
+  await loadAll();
+
+  let pesan = reset
+    ? "Kontrak baru diterapkan dan data pemilihan sebelumnya dikosongkan. Langkah berikutnya: klik \"Periksa relayer\", lalu \"Mulai Sesi Voting\"."
+    : "Alamat kontrak diperbarui. Data pemilihan tidak diubah.";
+  if (relayerRow && relayerRow.alamat_relayer && !sameAddress(relayerRow.alamat_relayer, state.relayer)) {
+    pesan += ` PERHATIAN: relayer yang terdaftar di kontrak baru (${shortAddress(state.relayer)}) berbeda dengan wallet relayer yang berjalan (${shortAddress(relayerRow.alamat_relayer)}). Daftarkan wallet relayer lewat panel "Ganti relayer" sebelum membuka sesi.`;
+  }
+  showResult("success", pesan);
+  showToast("success", "Kontrak pemilihan diterapkan.");
+}
+
+// ---------------------------------------------------------
+// Relayer otomatis (Edge Function "relayer")
+// ---------------------------------------------------------
+// Memanggil Edge Function sebagai admin. aksi: "cek" | "siklus" | "paksa".
+// Melempar Error dengan properti `unreachable` bila fungsinya tidak terpasang/tidak terjangkau.
+async function callRelayer(aksi) {
+  const { data } = await sb.auth.getSession();
+  const session = data && data.session;
+  if (!session) throw new Error("Sesi login admin tidak ditemukan. Login ulang lalu coba lagi.");
+
+  let res;
+  try {
+    res = await fetch(RELAYER_FN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ aksi }),
+    });
+  } catch (_) {
+    const err = new Error("Edge Function relayer tidak dapat dihubungi (belum di-deploy, atau koneksi bermasalah).");
+    err.unreachable = true;
+    throw err;
+  }
+  if (res.status === 404) {
+    const err = new Error("Edge Function relayer belum di-deploy di Supabase.");
+    err.unreachable = true;
+    throw err;
+  }
+
+  let hasil = null;
+  try {
+    hasil = await res.json();
+  } catch (_) {
+    /* bukan JSON */
+  }
+  if (res.status === 401) throw new Error("Edge Function menolak akses. Pastikan Anda login sebagai admin.");
+  if (!hasil) throw new Error(`Edge Function relayer mengembalikan HTTP ${res.status}.`);
+  return hasil;
+}
+
+// Tahap awal "Mulai Sesi Voting": pastikan relayer siap SEBELUM sesi dibuka, supaya suara
+// pertama tidak tertahan di antrian tanpa ada yang mengirim.
+async function prepareOpen() {
+  setStep("relayer", "active");
+  await loadRelayerRow();
+  if (relayerRow && relayerRow.aktif === false) {
+    throw new Error("Relayer sedang dijeda. Nyalakan kembali saklar relayer di panel Relayer, lalu coba lagi.");
+  }
+
+  let hasil;
+  try {
+    hasil = await callRelayer("cek");
+  } catch (e) {
+    if (!e.unreachable) throw e;
+    // Edge Function belum terpasang: tetap izinkan relayer manual (npm start) selama
+    // detak jantungnya segar dan tanpa error.
+    if (heartbeatSegar()) {
+      setStep("relayer", "done");
+      return;
+    }
+    throw new Error(
+      `${e.message} Pasang Edge Function relayer (lihat supabase/PANDUAN_EDGE_FUNCTION.md), atau jalankan relayer manual (npm start), lalu coba lagi.`
+    );
+  }
+  await loadRelayerRow();
+  render();
+  if (!hasil.ok) throw new Error(`Relayer belum siap: ${hasil.pesan}`);
+  setStep("relayer", "done");
+}
+
+function renderRelayerControls() {
+  const ada = !!relayerRow;
+  const aktif = ada ? relayerRow.aktif !== false : true;
+  const berjalan = sesiBerjalanDb();
+
+  el.relayerToggle.checked = aktif;
+  el.relayerToggle.disabled = !ada || busy || relayerBusy;
+  el.relayerToggleLabel.textContent = aktif ? "Relayer otomatis aktif" : "Relayer dijeda";
+  el.btnRelayerCek.disabled = busy || relayerBusy;
+  el.btnRelayerKirim.disabled = busy || relayerBusy || !berjalan || !aktif;
+
+  let hint;
+  if (relayerCtlMessage) hint = relayerCtlMessage;
+  else if (!aktif) {
+    hint = "Relayer sedang dijeda. Suara tetap aman di antrian, tetapi tidak dikirim ke blockchain sampai saklar dinyalakan lagi.";
+  } else if (!berjalan) {
+    hint = 'Siaga: relayer otomatis bekerja saat sesi voting berlangsung. Klik "Periksa relayer" untuk memastikan semuanya siap sebelum memulai sesi.';
+  } else {
+    hint = 'Relayer otomatis berjalan tiap menit. "Kirim sekarang" mengirim antrian saat ini juga, tanpa menunggu selang waktu dan batas minimal batch.';
+  }
+  el.relayerCtlHint.textContent = hint;
+}
+
+async function runRelayerControl(aksi, labelBusy, button) {
+  if (busy || relayerBusy) return;
+  relayerBusy = true;
+  relayerCtlMessage = "";
+  const labelAwal = button.textContent;
+  button.textContent = labelBusy;
+  renderRelayerControls();
+  try {
+    const hasil = await callRelayer(aksi);
+    relayerCtlMessage = hasil.pesan || "";
+    showToast(hasil.ok ? "success" : "error", hasil.pesan || (hasil.ok ? "Selesai." : "Gagal."));
+  } catch (e) {
+    relayerCtlMessage = e.message;
+    showToast("error", e.message);
+  } finally {
+    button.textContent = labelAwal;
+    relayerBusy = false;
+    try {
+      await loadLive();
+    } catch (_) {
+      /* tampilan diperbarui pada siklus berikutnya */
+    }
+    render();
+  }
+}
+
+async function toggleRelayerAktif() {
+  if (busy || relayerBusy) return;
+  const aktif = el.relayerToggle.checked;
+  if (!aktif && sesiBerjalanDb()) {
+    const lanjut = window.confirm(
+      "Sesi voting sedang berlangsung. Jika relayer dijeda, suara mahasiswa tidak dikirim ke blockchain dan sesi tidak bisa ditutup sampai relayer dilanjutkan. Jeda sekarang?"
+    );
+    if (!lanjut) {
+      el.relayerToggle.checked = true;
+      return;
+    }
+  }
+  relayerBusy = true;
+  relayerCtlMessage = "";
+  renderRelayerControls();
+  try {
+    const { error } = await sb.rpc("fn_set_relayer_aktif", { p_aktif: aktif });
+    if (error) throw new Error(error.message);
+    showToast("success", aktif ? "Relayer dilanjutkan." : "Relayer dijeda.");
+  } catch (e) {
+    relayerCtlMessage = `Gagal mengubah pengaturan relayer: ${e.message} (sudah menjalankan supabase/patch_relayer_otomatis.sql?)`;
+    showToast("error", "Gagal mengubah pengaturan relayer.");
+  } finally {
+    relayerBusy = false;
+    await loadRelayerRow();
+    render();
+  }
+}
+
 // Tahap penutupan: hentikan suara baru di database, lalu tunggu relayer mengosongkan antrian.
 async function prepareClose() {
   setStep("stop", "active");
@@ -924,9 +1315,17 @@ async function prepareClose() {
   setStep("flush", "active");
   abortRequested = false;
   el.btnAbort.classList.remove("hidden");
+  let terakhirPicu = 0;
   try {
     for (; ;) {
       if (abortRequested) throw { aborted: true };
+
+      // Minta relayer otomatis mengirim sisa suara SEKARANG (tidak menunggu penjadwal).
+      // Hasilnya tidak ditunggu; jika Edge Function tidak terpasang (relayer manual), diabaikan.
+      if (Date.now() - terakhirPicu > 30_000) {
+        terakhirPicu = Date.now();
+        callRelayer("siklus").catch(() => { });
+      }
 
       let sisa = null;
       try {
@@ -945,7 +1344,7 @@ async function prepareClose() {
           ? "Gagal membaca isi antrian, mencoba lagi..."
           : `Menunggu ${sisa} suara terkirim ke blockchain oleh relayer...`;
       if (health.state === "bad") {
-        pesan += " Relayer tampak tidak aktif atau bermasalah: jalankan relayer, atau batalkan penutupan.";
+        pesan += " Relayer tampak tidak aktif, dijeda, atau bermasalah: periksa panel Relayer di bawah, atau batalkan penutupan.";
       }
       setNote(pesan);
 
@@ -1105,7 +1504,8 @@ async function checkPendingStatus() {
 }
 
 async function runAction() {
-  if (busy || !pendingAction || !wallet) return;
+  if (busy || !pendingAction) return;
+  if (pendingAction !== "kontrak" && !wallet) return; // mengatur kontrak hanya mengubah database; tanpa MetaMask
   const action = pendingAction;
   const cfg = ACTIONS[action];
 
@@ -1115,6 +1515,11 @@ async function runAction() {
 
   let txHash = null;
   try {
+    if (action === "kontrak") {
+      await terapkanKontrak();
+      return;
+    }
+    if (action === "open") await prepareOpen();
     if (action === "close") await prepareClose();
 
     // 1) Simulasi dulu (tanpa biaya): jika kontrak akan menolak, pesannya jelas dan admin
@@ -1159,7 +1564,7 @@ async function runAction() {
     const d = describeChainError(e);
     let message = d.message;
     // Gagal di tahap database padahal transaksi sudah berhasil di blockchain
-    if (currentStep === "db") {
+    if (currentStep === "db" && action !== "kontrak") {
       message = `Transaksi berhasil di blockchain, tetapi database gagal diperbarui: ${e.message} Muat ulang halaman ini; sinkronisasi dilakukan otomatis.`;
       syncError = e.message;
     }
@@ -1191,6 +1596,12 @@ el.btnOpen.addEventListener("click", () => openConfirm("open"));
 el.btnClose.addEventListener("click", () => openConfirm("close"));
 el.btnSetRelayer.addEventListener("click", () => openConfirm("relayer"));
 el.relayerInput.addEventListener("input", renderRelayerForm);
+el.relayerToggle.addEventListener("change", toggleRelayerAktif);
+el.kontrakInput.addEventListener("input", renderKontrakPanel);
+el.kontrakReset.addEventListener("change", renderKontrakPanel);
+el.btnSetKontrak.addEventListener("click", () => openConfirm("kontrak"));
+el.btnRelayerCek.addEventListener("click", () => runRelayerControl("cek", "Memeriksa...", el.btnRelayerCek));
+el.btnRelayerKirim.addEventListener("click", () => runRelayerControl("paksa", "Mengirim...", el.btnRelayerKirim));
 
 el.btnCancelClose.addEventListener("click", async () => {
   if (busy || !closingInProgress()) return;
