@@ -8,7 +8,7 @@ Tanpa React/Next.js — hanya HTML, CSS, dan JavaScript biasa. Library dimuat le
 index.html               → Login/register mahasiswa            (logic: js/Userpage.js)
 landing.html             → Landing page pemilih setelah login   (logic: js/Landing.js)
 forgot-password.html     → Lupa password                        (logic: js/Forgotpassword.js)
-admin.html               → Login/register admin                 (logic: js/Adminpage.js)
+admin.html               → Login admin (tanpa register)                (logic: js/Adminpage.js)
 
 admin/
   konfirmasi.html        → Setujui/tolak pendaftaran mahasiswa  (js/Konfirmasi.js)
@@ -128,7 +128,7 @@ Pakai server lokal sederhana (membuka lewat `file://` bisa diblokir browser):
 
 ## 4. Alur Pengujian
 
-1. Daftar & login admin di `admin.html`
+1. Tambah akun admin lewat `supabase/tambah_admin.sql`, lalu login di `admin.html`
 2. Menu **Kandidat** → **+ Tambah Kandidat** → isi minimal 2 paslon
 3. Daftar mahasiswa di `index.html` → admin setujui lewat **Konfirmasi Pendaftaran**
 4. Login sebagai mahasiswa → masuk ke `landing.html`: nama tampil di header, kandidat tampil, klik **Pilih Paslon** → popup konfirmasi → **Ya, Kirim Suara**

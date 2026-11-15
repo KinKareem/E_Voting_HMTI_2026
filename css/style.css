@@ -70,7 +70,7 @@ body {
 
 body {
   position: relative;
-  background: #fff;
+  background: #eaeaea;
   color: var(--bark-900);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -510,7 +510,7 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background: url("background.png") center top / 620px auto repeat;
-  opacity: .5
+  opacity: 0.035;
 }
 
 @media(prefers-reduced-motion:reduce) {
@@ -2453,7 +2453,6 @@ table.data-table tbody tr:not(.row-top):hover td {
   top: -34px;
   transform: translateX(-50%);
   color: #ffeab0;
-  filter: drop-shadow(0 0 10px rgba(240, 185, 90, 0.7));
 }
 
 /* Angka di bawah garis dasar */
@@ -2883,5 +2882,50 @@ code {
 
   .brand-panel {
     padding: 22px 26px
+  }
+}
+
+/* ---------- logo tanpa kotak putih + sidebar admin ---------- */
+.sidebar-header {
+  gap: 6px;
+  padding: 18px 14px
+}
+
+.sidebar-header .logo-tile {
+  width: 52px;
+  height: 52px;
+  background: transparent;
+  border-radius: 0
+}
+
+.sidebar-header .logo-tile img {
+  width: 46px;
+  height: 46px
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center
+}
+
+.sidebar-title {
+  margin: 0;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap
+}
+
+.sidebar-credit .logo-tile {
+  background: transparent
+}
+
+/* kolom sidebar sudah "dipesan" sejak awal agar layout tidak melompat / sidebar tidak hilang saat pindah halaman */
+@media (min-width: 768px) {
+  #sidebar-root {
+    flex: 0 0 272px;
+    min-height: 100vh;
+    background: #2f1a0d
   }
 }

@@ -1142,6 +1142,18 @@ body {
 
 .footer-logos .logo-tile img {
   width: 42px;
-  height: 42px;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .35))
+  height: 42px
+}
+
+/* logo header landing: tanpa kotak putih & lebih besar */
+.landing-header .logo-tile {
+  width: 54px;
+  height: 54px;
+  background: transparent;
+  border-radius: 0
+}
+
+.landing-header .logo-tile img {
+  width: 48px;
+  height: 48px
 }

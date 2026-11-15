@@ -48,42 +48,6 @@ const Auth = {
     };
   },
 
-  async registerAdmin({ nim, namaLengkap, email, password }) {
-    const { data: signUpData, error: signUpError } = await sb.auth.signUp({
-      email,
-      password,
-    });
-
-    if (signUpError || !signUpData.user) {
-      return {
-        success: false,
-        message: signUpError ? signUpError.message : "Registrasi gagal, silakan coba lagi.",
-      };
-    }
-
-    const { error: profileError } = await sb.from("tb_pengguna").insert({
-      id: signUpData.user.id,
-      nim,
-      nama_lengkap: namaLengkap,
-      email,
-      role: "admin",
-      status: "approved",
-      has_voted: false,
-    });
-
-    if (profileError) {
-      return {
-        success: false,
-        message: isDuplicateError(profileError)
-          ? "NIM/ID ini sudah terdaftar sebelumnya."
-          : profileError.message,
-      };
-    }
-
-    return { success: true, message: "Registrasi admin berhasil. Silakan login." };
-  },
-
-
   async loginByNim({ nim, password, expectedRole }) {
     const email = await getEmailByNim(nim);
     if (!email) {

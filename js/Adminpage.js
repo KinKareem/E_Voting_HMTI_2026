@@ -1,21 +1,8 @@
 /* =========================================================
    Adminpage.js
-   Logic untuk admin.html — login & register admin, termasuk
+   Logic untuk admin.html — login admin. Pendaftaran admin sengaja tidak ada;
+   akun admin ditambahkan manual lewat SQL (supabase/tambah_admin.sql).
    ========================================================= */
-
-const tabLogin = document.getElementById("tab-login");
-const tabRegister = document.getElementById("tab-register");
-const authTrack = document.getElementById("auth-track");
-
-function setAuthMode(mode) {
-  const isRegister = mode === "register";
-  authTrack.classList.toggle("show-register", isRegister);
-  tabLogin.classList.toggle("active", !isRegister);
-  tabRegister.classList.toggle("active", isRegister);
-}
-
-tabLogin.addEventListener("click", () => setAuthMode("login"));
-tabRegister.addEventListener("click", () => setAuthMode("register"));
 
 function showStatus(elementId, type, message) {
   const el = document.getElementById(elementId);
@@ -61,43 +48,4 @@ loginForm.addEventListener("submit", async (e) => {
 
   showStatus("login-status", "success", "Login berhasil, mengalihkan...");
   window.location.href = "admin/konfirmasi.html";
-});
-
-// --- Form REGISTER ADMIN ---
-const registerForm = document.getElementById("register-form");
-const registerSubmit = document.getElementById("register-submit");
-
-registerForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  hideStatus("register-status");
-
-  const nim = document.getElementById("reg-nim").value.trim();
-  const namaLengkap = document.getElementById("reg-nama").value.trim();
-  const email = document.getElementById("reg-email").value.trim();
-  const password = document.getElementById("reg-password").value;
-  const confirmPassword = document.getElementById("reg-confirm-password").value;
-
-  if (password !== confirmPassword) {
-    showStatus("register-status", "error", "Konfirmasi password tidak cocok.");
-    return;
-  }
-  if (password.length < 6) {
-    showStatus("register-status", "error", "Password minimal 6 karakter.");
-    return;
-  }
-
-  registerSubmit.disabled = true;
-  registerSubmit.textContent = "Memproses...";
-
-  const result = await Auth.registerAdmin({ nim, namaLengkap, email, password });
-
-  registerSubmit.disabled = false;
-  registerSubmit.textContent = "Daftar";
-
-  showStatus("register-status", result.success ? "success" : "error", result.message);
-
-  if (result.success) {
-    registerForm.reset();
-    setTimeout(() => setAuthMode("login"), 1200);
-  }
 });

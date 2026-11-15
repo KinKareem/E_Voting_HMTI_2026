@@ -145,5 +145,11 @@ async function guardAdmin() {
   return true;
 }
 
-window.adminReady = guardAdmin();
+// Sidebar dirender SEGERA (sebelum library Supabase selesai diunduh) supaya tidak ada kedip/hilang saat pindah menu.
+// Script ini harus dipasang SEBELUM script Supabase di HTML. Pengecekan admin menunggu sampai Supabase siap.
 renderSidebar();
+window.adminReady = new Promise((resolve) => {
+  const start = () => guardAdmin().then(resolve, () => resolve(false));
+  if (typeof sb !== "undefined") start();
+  else document.addEventListener("DOMContentLoaded", start);
+});

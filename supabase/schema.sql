@@ -807,23 +807,15 @@ drop policy if exists "tb_log_admin: admin tambah" on public.tb_log_admin;
 -- tb_pengguna
 create policy "tb_pengguna: baca baris sendiri" on public.tb_pengguna for
 select using (auth.uid() = id);
--- Saat registrasi, user hanya boleh membuat baris dirinya sendiri dengan nilai
--- awal yang wajar: mahasiswa harus ' pending ', dan tidak ada yang boleh
--- mendaftar dengan has_voted = true.
+-- Saat registrasi, user hanya boleh membuat baris dirinya sendiri sebagai mahasiswa
+-- 'pending' dan has_voted = false. Akun ADMIN TIDAK BISA dibuat lewat jalur ini;
+-- admin hanya ditambahkan manual lewat SQL Editor (lihat tambah_admin.sql).
 create policy "tb_pengguna: daftar akun sendiri" on public.tb_pengguna for
 insert with check (
     auth.uid() = id
     and has_voted = false
-    and (
-      (
-        role = ' mahasiswa '
-        and status = ' pending '
-      )
-      or (
-        role = ' admin '
-        and status = ' approved '
-      )
-    )
+    and role = 'mahasiswa'
+    and status = 'pending'
   );
 create policy "tb_pengguna: admin baca semua" on public.tb_pengguna for
 select using (public.is_admin());
