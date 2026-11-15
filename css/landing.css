@@ -13,7 +13,7 @@ html {
 }
 
 body {
-  background: #fff
+  background: transparent
 }
 
 .logo-tile {
@@ -57,7 +57,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(70, 40, 20, .97);
+  background: var(--grad-bar);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(228, 223, 220, .14)
@@ -67,7 +67,7 @@ body {
   display: flex;
   align-items: center;
   gap: 24px;
-  padding: 12px max(var(--pad), calc((100% - 1160px)/2))
+  padding: 12px max(var(--pad), calc((100% - var(--wrap))/2))
 }
 
 .brand-mark {
@@ -173,13 +173,12 @@ body {
   position: relative;
   overflow: hidden;
   color: var(--ink);
-  border-bottom: 1px solid var(--line);
-  padding: clamp(40px, 6vw, 80px) max(var(--pad), calc((100% - 1160px)/2));
+  padding: clamp(36px, 5vw, 64px) max(var(--pad), calc((100% - var(--wrap))/2));
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
   gap: clamp(24px, 5vw, 64px);
   align-items: center;
-  background: radial-gradient(800px 420px at 80% 10%, rgba(226, 152, 58, .16), transparent 60%), #fff
+  background: radial-gradient(800px 420px at 80% 10%, rgba(226, 152, 58, .16), transparent 60%), transparent
 }
 
 .hero-ring {
@@ -202,7 +201,13 @@ body {
 }
 
 .hero-inner {
-  position: relative
+  position: relative;
+  padding: clamp(20px, 3vw, 32px);
+  background: rgba(255, 255, 255, .88);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px)
 }
 
 .hero-steps {
@@ -336,17 +341,27 @@ body {
 
 /* ---------- section ---------- */
 .section {
-  padding: clamp(56px, 8vw, 96px) var(--pad)
+  padding: clamp(40px, 5vw, 68px) var(--pad)
+}
+
+#kandidat.section {
+  padding-top: clamp(28px, 3.2vw, 44px)
 }
 
 .section>div {
-  max-width: 1160px;
+  max-width: var(--wrap);
   margin: 0 auto
 }
 
 .section-head {
   margin-bottom: 36px;
-  max-width: 680px
+  max-width: 680px;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, .88);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px)
 }
 
 .section-eyebrow {
@@ -570,7 +585,7 @@ body {
 
 /* ---------- hasil ---------- */
 .section-hasil {
-  background: var(--mist)
+  background: rgba(228, 223, 220, .35)
 }
 
 .hasil-grid {
@@ -823,9 +838,9 @@ body {
 
 /* ---------- footer ---------- */
 .landing-footer {
-  background: var(--espresso);
+  background: var(--grad-foot);
   color: var(--mist);
-  padding: 56px max(var(--pad), calc((100% - 1160px)/2)) 24px
+  padding: 56px max(var(--pad), calc((100% - var(--wrap))/2)) 24px
 }
 
 .footer-grid {
@@ -1118,4 +1133,15 @@ body {
   .footer-grid {
     grid-template-columns: 1fr
   }
+}
+
+/* logo di footer: tanpa kotak putih */
+.footer-logos .logo-tile {
+  background: transparent
+}
+
+.footer-logos .logo-tile img {
+  width: 42px;
+  height: 42px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .35))
 }

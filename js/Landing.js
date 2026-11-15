@@ -52,7 +52,6 @@ const el = {
   verifyList: document.getElementById("verify-list"),
   verifyChain: document.getElementById("v-chain"),
   verifyVoted: document.getElementById("v-voted"),
-  verifyQueue: document.getElementById("v-queue"),
   verifyNote: document.getElementById("verify-note"),
   hasilSection: document.getElementById("hasil"),
   hasilGrid: document.getElementById("hasil-grid"),
@@ -537,6 +536,9 @@ async function fetchRingkasan() {
     sudahMemilih: Number(data.sudah_memilih),
     menunggu: Number(data.menunggu),
     diproses: Number(data.diproses),
+    // Jumlah mahasiswa yang berhak memilih (akun mahasiswa berstatus approved; admin tidak dihitung).
+    // NaN bila fungsi database belum diperbarui (patch_total_pemilih.sql): tampilan jatuh ke angka saja.
+    totalPemilih: Number(data.total_pemilih),
   };
 }
 
@@ -562,11 +564,12 @@ function updateVerify() {
   }
 
   const x = chainState.totalVotes;
-  const antrian = ringkasanSesudah.menunggu + ringkasanSesudah.diproses;
+  const sudah = ringkasanSesudah.sudahMemilih;
+  const total = ringkasanSesudah.totalPemilih;
   el.verifyList.classList.remove("hidden");
   el.verifyChain.textContent = String(x);
-  el.verifyVoted.textContent = String(ringkasanSesudah.sudahMemilih);
-  el.verifyQueue.textContent = String(antrian);
+  // "sudah memilih / seluruh mahasiswa yang berhak memilih", mis. 12/160
+  el.verifyVoted.textContent = Number.isFinite(total) ? `${sudah}/${total}` : String(sudah);
 
   const batasBawah =
     ringkasanSebelum.sudahMemilih - (ringkasanSebelum.menunggu + ringkasanSebelum.diproses);

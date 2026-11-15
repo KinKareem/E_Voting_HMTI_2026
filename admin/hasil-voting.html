@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hasil Voting — Panel Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+
+<body>
+  <div class="admin-layout">
+    <div id="sidebar-root"></div>
+
+    <main class="dashboard-main">
+      <div class="dashboard-inner">
+        <header class="page-header">
+          <div>
+            <p class="page-eyebrow">Panel Admin</p>
+            <h1 class="page-title">Hasil Voting</h1>
+            <p class="page-subtitle" id="hv-subtitle">Memuat status sesi...</p>
+          </div>
+        </header>
+
+        <div id="hv-status" class="status-msg info hidden" role="status"></div>
+
+        <!-- Panggung peragaan hasil. Seluruh panggung ini yang tampil saat layar penuh. -->
+        <section class="hv-stage hidden" id="hv-stage" aria-label="Peragaan hasil pemilihan">
+          <button type="button" class="hv-replay hidden" id="hv-replay">Putar ulang</button>
+          <button type="button" class="hv-fs hidden" id="hv-fs">Layar penuh</button>
+
+          <!-- Bagian atas: keterangan selama animasi, lalu diganti pengumuman pemenang -->
+          <div class="hv-head">
+            <p class="hv-caption" id="hv-caption" aria-live="polite"></p>
+            <div class="hv-banner" id="hv-banner" aria-live="polite">
+              <p class="hv-banner-eyebrow" id="hv-banner-eyebrow"></p>
+              <h2 class="hv-banner-title" id="hv-banner-title"></h2>
+              <p class="hv-banner-text" id="hv-banner-text"></p>
+            </div>
+          </div>
+
+          <div class="hv-chart" id="hv-chart"></div>
+
+          <!-- Tombol mulai: melayang di tengah panggung sampai ditekan -->
+          <div class="hv-start-wrap" id="hv-start-wrap">
+            <button type="button" class="hv-start" id="hv-start" disabled>Lihat Hasil Pemilihan</button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script src="../js/Supabaseclient.js"></script>
+  <script src="../js/Blockchainconfig.js"></script>
+  <script src="../js/Blockchain.js"></script>
+  <script src="../js/Sidebar.js"></script>
+  <script src="../js/Hasilvoting.js"></script>
+</body>
+
+</html>

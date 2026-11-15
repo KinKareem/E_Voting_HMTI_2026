@@ -477,33 +477,44 @@ from public;
 grant execute on function public.fn_kirim_suara(uuid) to authenticated;
 -- Ringkasan jumlah (tanpa identitas apa pun) untuk transparansi: dipakai landing page dan
 -- halaman admin untuk membandingkan jumlah pemilih dengan suara di blockchain.
+-- Ringkasan jumlah suara (tanpa identitas apa pun) untuk halaman landing dan admin.
+--   sudah_memilih : mahasiswa yang sudah memilih
+--   total_pemilih : mahasiswa yang berhak memilih (akun mahasiswa berstatus 'approved'; admin tidak dihitung)
+--   menunggu / diproses / terkirim : jumlah suara di antrian menurut statusnya
 create or replace function public.fn_ringkasan_suara() returns json language sql security definer
 set search_path = public stable as $$
 select json_build_object(
-    ' sudah_memilih ',
+    'sudah_memilih',
     (
       select count(*)
       from public.tb_pengguna p
-      where p.role = ' mahasiswa '
+      where p.role = 'mahasiswa'
         and p.has_voted
     ),
-    ' menunggu ',
+    'total_pemilih',
     (
       select count(*)
-      from public.tb_antrian_suara a
-      where a.status = ' menunggu '
+      from public.tb_pengguna p
+      where p.role = 'mahasiswa'
+        and p.status = 'approved'
     ),
-    ' diproses ',
+    'menunggu',
     (
       select count(*)
       from public.tb_antrian_suara a
-      where a.status = ' diproses '
+      where a.status = 'menunggu'
     ),
-    ' terkirim ',
+    'diproses',
     (
       select count(*)
       from public.tb_antrian_suara a
-      where a.status = ' terkirim '
+      where a.status = 'diproses'
+    ),
+    'terkirim',
+    (
+      select count(*)
+      from public.tb_antrian_suara a
+      where a.status = 'terkirim'
     )
   );
 $$;
@@ -723,7 +734,9 @@ set status = 'belum_mulai',
   diperbarui_pada = now()
 where id = 1;
 alter table public.tb_sesi_voting enable trigger trg_jaga_transisi_sesi;
-delete from public.tb_antrian_suara;
+-- WHERE true: Supabase menolak DELETE tanpa WHERE saat dipanggil lewat API (pg_safeupdate)
+delete from public.tb_antrian_suara
+where true;
 update public.tb_pengguna
 set has_voted = false
 where has_voted;

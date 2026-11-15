@@ -6,6 +6,7 @@ const MENU_ITEMS = [
   { href: "konfirmasi.html", label: "Konfirmasi Pendaftaran" },
   { href: "kandidat.html", label: "Kandidat" },
   { href: "sesi-voting.html", label: "Sesi Voting" },
+  { href: "hasil-voting.html", label: "Hasil Voting" },
   { href: "list-voting.html", label: "List Voting" },
 ];
 
@@ -103,6 +104,14 @@ function iconFor(href) {
     return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
       <circle cx="12" cy="12" r="9" />
       <path d="M10 8.5l5 3.5-5 3.5z" stroke-linejoin="round" />
+    </svg>`;
+  }
+  if (href === "hasil-voting.html") {
+    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <path d="M4 20h16" stroke-linecap="round" />
+      <rect x="5" y="12" width="3.6" height="8" rx="0.8" />
+      <rect x="10.2" y="7" width="3.6" height="13" rx="0.8" />
+      <rect x="15.4" y="3.5" width="3.6" height="16.5" rx="0.8" />
     </svg>`;
   }
   if (href === "list-voting.html") {
