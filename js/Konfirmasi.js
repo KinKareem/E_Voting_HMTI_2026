@@ -99,9 +99,15 @@ function renderTable() {
         <td class="muted">${escapeHtml(p.email)}</td>
         <td class="muted">${formatDate(p.created_at)}</td>
         <td>
+          ${p.ktm_path
+          ? `<button class="btn-link" data-ktm="${escapeHtml(p.ktm_path)}">Lihat KTM</button>`
+          : `<span class="muted">Belum ada</span>`
+        }
+        </td>
+        <td>
           <div class="action-group">
             <button class="btn-approve" data-action="approved" data-id="${p.id}">Setujui</button>
-            <button class="btn-reject" data-action="rejected" data-id="${p.id}">Tolak</button>
+            <button class="btn-reject" data-action="rejected" data-id="${p.id}" data-nama="${escapeHtml(p.nama_lengkap)} (${escapeHtml(p.nim)})">Tolak</button>
           </div>
         </td>
       </tr>
@@ -118,6 +124,7 @@ function renderTable() {
           <th>Nama Lengkap</th>
           <th>Email</th>
           <th>Terdaftar</th>
+          <th>KTM</th>
           <th style="text-align:right">Aksi</th>
         </tr>
       </thead>
@@ -126,7 +133,32 @@ function renderTable() {
   `;
 
   document.querySelectorAll("[data-action]").forEach((btn) => {
-    btn.addEventListener("click", () => handleDecision(btn.dataset.id, btn.dataset.action));
+    btn.addEventListener("click", () => {
+      if (btn.dataset.action === "rejected") {
+        const nama = btn.dataset.nama || "mahasiswa ini";
+        const yakin = window.confirm(
+          `Tolak pendaftaran ${nama}?\n\nAkun, status pendaftaran, dan file KTM yang sudah diunggah akan DIHAPUS PERMANEN. Mahasiswa ini bisa mendaftar ulang dari awal.`
+        );
+        if (!yakin) return;
+      }
+      handleDecision(btn.dataset.id, btn.dataset.action);
+    });
+  });
+
+  // Bucket "ktm-mahasiswa" privat, jadi link langsung tidak bisa dibuka begitu saja.
+  // Perlu signed URL sementara (berlaku 60 detik) yang dibuat saat tombol diklik.
+  document.querySelectorAll("[data-ktm]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const path = btn.dataset.ktm;
+      const { data, error } = await sb.storage.from("ktm-mahasiswa").createSignedUrl(path, 60);
+      btn.disabled = false;
+      if (error || !data) {
+        showToast("error", "Gagal membuka file KTM: " + (error ? error.message : "tidak diketahui"));
+        return;
+      }
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    });
   });
 }
 
@@ -135,6 +167,25 @@ async function handleDecision(id, decision) {
   const buttons = document.querySelectorAll(`[data-id="${id}"]`);
   buttons.forEach((b) => (b.disabled = true));
 
+  // Ditolak: hapus akun + file KTM sepenuhnya (lihat fn_admin_tolak_pendaftaran),
+  // bukan cuma ubah status, supaya mahasiswa yang ditolak benar-benar bisa
+  // mendaftar ulang dari nol dengan NIM yang sama.
+  if (decision === "rejected") {
+    const { error } = await sb.rpc("fn_admin_tolak_pendaftaran", { p_user_id: id });
+
+    if (error) {
+      showToast("error", `Gagal menolak pendaftaran: ${error.message}`);
+      buttons.forEach((b) => (b.disabled = false));
+      return;
+    }
+
+    pendingList = pendingList.filter((p) => p.id !== id);
+    renderTable();
+
+    const who = target ? `${target.nama_lengkap} (${target.nim})` : "Mahasiswa";
+    showToast("success", `Pendaftaran ${who} ditolak dan datanya dihapus.`);
+    return;
+  }
 
   const { data, error } = await sb
     .from("tb_pengguna")
@@ -156,10 +207,7 @@ async function handleDecision(id, decision) {
   renderTable();
 
   const who = target ? `${target.nama_lengkap} (${target.nim})` : "Mahasiswa";
-  showToast(
-    "success",
-    decision === "approved" ? `Pendaftaran ${who} disetujui.` : `Pendaftaran ${who} ditolak.`
-  );
+  showToast("success", `Pendaftaran ${who} disetujui.`);
 }
 
 function formatDate(isoString) {

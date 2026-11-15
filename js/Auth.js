@@ -8,7 +8,22 @@
 
 const Auth = {
 
-  async registerMahasiswa({ nim, namaLengkap, email, password }) {
+  // fileKtm: objek File dari <input type="file">, berisi scan KTM dalam format PDF (maks 200KB).
+  async registerMahasiswa({ nim, namaLengkap, email, password, fileKtm }) {
+    if (!fileKtm) {
+      return { success: false, message: "Scan KTM (PDF) wajib diunggah." };
+    }
+    if (fileKtm.type !== "application/pdf") {
+      return { success: false, message: "File KTM harus berformat PDF." };
+    }
+    const MAKS_UKURAN_KTM = 200 * 1024; // 200KB, harus sama dengan file_size_limit bucket di schema.sql
+    if (fileKtm.size > MAKS_UKURAN_KTM) {
+      return {
+        success: false,
+        message: "Ukuran file KTM maksimal 200KB. Silakan kompres PDF-nya terlebih dahulu.",
+      };
+    }
+
     const { data: signUpData, error: signUpError } = await sb.auth.signUp({
       email,
       password,
@@ -21,15 +36,32 @@ const Auth = {
       };
     }
 
+    // Upload KTM dulu (butuh sesi login, yang baru didapat dari signUp di atas), baru simpan
+    // path-nya lewat fn_daftar_mahasiswa. Nama file diberi timestamp supaya upload ulang tidak bentrok.
+    const pathKtm = `${signUpData.user.id}/ktm-${Date.now()}.pdf`;
+    const { error: uploadError } = await sb.storage
+      .from("ktm-mahasiswa")
+      .upload(pathKtm, fileKtm, { contentType: "application/pdf" });
+
+    if (uploadError) {
+      await sb.auth.signOut();
+      return {
+        success: false,
+        message: "Gagal mengunggah KTM: " + uploadError.message,
+      };
+    }
+
     // Mengaitkan akun login dengan baris mahasiswa di tb_pengguna yang sudah ada,
     // atau membuat baris baru bila NIM belum ada (lihat fn_daftar_mahasiswa).
     const { error: profileError } = await sb.rpc("fn_daftar_mahasiswa", {
       p_nim: nim,
       p_nama: namaLengkap,
       p_email: email,
+      p_ktm_path: pathKtm,
     });
 
     if (profileError) {
+      await sb.auth.signOut();
       return {
         success: false,
         message:

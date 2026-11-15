@@ -6,6 +6,10 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
 
+@view-transition {
+  navigation: auto;
+}
+
 :root {
   /* palet baru */
   --ink: #1b1c1c;
@@ -275,6 +279,7 @@ h3 {
   background: var(--grad-brand)
 }
 
+/* Justify Logo */
 .brand-logo {
   width: min(170px, 70%);
   padding: 11px;
@@ -510,7 +515,7 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background: url("background.png") center top / 620px auto repeat;
-  opacity: 0.035;
+  opacity: 0.035
 }
 
 @media(prefers-reduced-motion:reduce) {
@@ -2928,4 +2933,24 @@ code {
     min-height: 100vh;
     background: #2f1a0d
   }
+}
+
+/* Tombol kecil untuk membuka file KTM di halaman Konfirmasi Pendaftaran */
+.btn-link {
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.85em;
+  cursor: pointer;
+  color: inherit;
+}
+
+.btn-link:hover {
+  opacity: 0.8;
+}
+
+.btn-link:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }

@@ -41,13 +41,15 @@ create table if not exists public.tb_pengguna (
   nim text not null unique,
   nama_lengkap text not null,
   email text,
-  prodi text,
-  angkatan text,
   role text not null default 'mahasiswa' check (role in ('mahasiswa', 'admin')),
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   has_voted boolean not null default false,
+  ktm_path text,
   created_at timestamptz not null default now()
 );
+-- Untuk database lama yang tabel tb_pengguna-nya dibuat sebelum ada kolom ini.
+alter table public.tb_pengguna
+add column if not exists ktm_path text;
 create index if not exists tb_pengguna_role_status_idx on public.tb_pengguna (role, status);
 create index if not exists tb_pengguna_nim_idx on public.tb_pengguna (nim);
 -- ---------------------------------------------------------
@@ -75,10 +77,6 @@ alter column id
 set default gen_random_uuid();
 alter table public.tb_pengguna
 alter column email drop not null;
-alter table public.tb_pengguna
-add column if not exists prodi text;
-alter table public.tb_pengguna
-add column if not exists angkatan text;
 -- Pengganti "on delete cascade": hapus baris tb_pengguna jika akun login-nya dihapus.
 create or replace function public.fn_hapus_pengguna_auth() returns trigger language plpgsql security definer
 set search_path = public as $$ begin
@@ -98,16 +96,12 @@ begin foreach t in array array ['tb_mahasiswa', 'mahasiswa_whitelist'] loop if t
   insert into public.tb_pengguna (
       nim,
       nama_lengkap,
-      prodi,
-      angkatan,
       role,
       status,
       has_voted
     )
   select m.nim,
     coalesce(nullif(m.nama_lengkap, ''), m.nim),
-    m.prodi,
-    m.angkatan,
     'mahasiswa',
     'pending',
     false
@@ -290,11 +284,26 @@ grant execute on function public.get_email_by_nim(text) to anon,
   authenticated;
 -- Pendaftaran mahasiswa: mengaitkan akun login yang baru dibuat dengan baris tb_pengguna
 -- yang sudah ada (berdasarkan NIM). Jika NIM belum ada, dibuat baris baru. Status tetap 'pending' sampai admin menyetujui.
-create or replace function public.fn_daftar_mahasiswa(p_nim text, p_nama text, p_email text) returns text language plpgsql security definer
+-- p_ktm_path: path file KTM (PDF) di storage bucket "ktm-mahasiswa", yang diupload
+-- SEBELUM memanggil fungsi ini (lihat js/Auth.js). Wajib diisi.
+drop function if exists public.fn_daftar_mahasiswa(text, text, text);
+create or replace function public.fn_daftar_mahasiswa(
+    p_nim text,
+    p_nama text,
+    p_email text,
+    p_ktm_path text
+  ) returns text language plpgsql security definer
 set search_path = public as $$
 declare v_uid uuid := auth.uid();
 v_row public.tb_pengguna %rowtype;
 begin if v_uid is null then raise exception 'Anda harus login untuk menyelesaikan pendaftaran.';
+end if;
+if p_ktm_path is null
+or length(trim(p_ktm_path)) = 0 then raise exception 'Scan KTM (PDF) wajib diunggah.';
+end if;
+-- Path yang dikirim harus benar-benar berada di folder milik user yang sedang login,
+-- supaya satu akun tidak bisa mengklaim file KTM milik akun lain.
+if p_ktm_path !~ ('^' || v_uid::text || '/') then raise exception 'Path KTM tidak valid.';
 end if;
 if exists (
   select 1
@@ -312,7 +321,8 @@ end if;
 -- nama_lengkap dari data admin dipertahankan
 update public.tb_pengguna
 set id = v_uid,
-  email = p_email
+  email = p_email,
+  ktm_path = p_ktm_path
 where nim = p_nim;
 else
 insert into public.tb_pengguna (
@@ -322,7 +332,8 @@ insert into public.tb_pengguna (
     email,
     role,
     status,
-    has_voted
+    has_voted,
+    ktm_path
   )
 values (
     v_uid,
@@ -331,15 +342,56 @@ values (
     p_email,
     'mahasiswa',
     'pending',
-    false
+    false,
+    p_ktm_path
   );
 end if;
 return 'ok';
 end;
 $$;
-revoke all on function public.fn_daftar_mahasiswa(text, text, text)
+revoke all on function public.fn_daftar_mahasiswa(text, text, text, text)
 from public;
-grant execute on function public.fn_daftar_mahasiswa(text, text, text) to authenticated;
+grant execute on function public.fn_daftar_mahasiswa(text, text, text, text) to authenticated;
+-- Dipanggil admin saat menolak pendaftaran mahasiswa. Menghapus file KTM di storage,
+-- lalu menghapus akun di auth.users -- yang lewat trigger trg_hapus_pengguna_auth
+-- (sudah ada di atas) otomatis ikut menghapus baris tb_pengguna-nya juga.
+-- Sengaja dibatasi hanya untuk baris role='mahasiswa' & status='pending', supaya
+-- fungsi ini tidak bisa disalahgunakan untuk menghapus admin atau mahasiswa yang
+-- sudah disetujui/sudah memilih.
+create or replace function public.fn_admin_tolak_pendaftaran(p_user_id uuid) returns text language plpgsql security definer
+set search_path = public as $$
+declare v_ktm_path text;
+v_role text;
+v_status text;
+begin if not public.is_admin() then raise exception 'Hanya admin yang boleh melakukan ini.';
+end if;
+select ktm_path,
+  role,
+  status into v_ktm_path,
+  v_role,
+  v_status
+from public.tb_pengguna
+where id = p_user_id;
+if not found then raise exception 'Akun tidak ditemukan.';
+end if;
+if v_role <> 'mahasiswa'
+or v_status <> 'pending' then raise exception 'Hanya pendaftaran mahasiswa berstatus pending yang bisa ditolak/dihapus lewat fungsi ini.';
+end if;
+if v_ktm_path is not null then
+delete from storage.objects
+where bucket_id = 'ktm-mahasiswa'
+  and name = v_ktm_path;
+end if;
+-- Menghapus baris auth.users ini otomatis memicu trg_hapus_pengguna_auth,
+-- yang menghapus baris tb_pengguna terkait.
+delete from auth.users
+where id = p_user_id;
+return 'ok';
+end;
+$$;
+revoke all on function public.fn_admin_tolak_pendaftaran(uuid)
+from public;
+grant execute on function public.fn_admin_tolak_pendaftaran(uuid) to authenticated;
 -- Menjaga salinan status sesi agar meniru aturan kontrak blockchain:
 --  * status hanya maju: belum_mulai -> berlangsung -> menutup -> selesai
 --  * satu-satunya langkah mundur yang boleh: menutup -> berlangsung (admin membatalkan
@@ -351,26 +403,26 @@ declare r_lama integer;
 r_baru integer;
 begin r_lama := case
   old.status
-  when ' belum_mulai ' then 0
-  when ' berlangsung ' then 1
-  when ' menutup ' then 2
+  when 'belum_mulai' then 0
+  when 'berlangsung' then 1
+  when 'menutup' then 2
   else 3
 end;
 r_baru := case
   new.status
-  when ' belum_mulai ' then 0
-  when ' berlangsung ' then 1
-  when ' menutup ' then 2
+  when 'belum_mulai' then 0
+  when 'berlangsung' then 1
+  when 'menutup' then 2
   else 3
 end;
-if old.status = ' selesai '
-and new.status <> ' selesai ' then raise exception ' Sesi yang sudah selesai tidak dapat dibuka kembali.';
+if old.status = 'selesai'
+and new.status <> 'selesai' then raise exception 'Sesi yang sudah selesai tidak dapat dibuka kembali.';
 end if;
 if r_baru < r_lama
 and not (
-  old.status = ' menutup '
-  and new.status = ' berlangsung '
-) then raise exception ' Status sesi tidak dapat dikembalikan ke tahap sebelumnya.';
+  old.status = 'menutup'
+  and new.status = 'berlangsung'
+) then raise exception 'Status sesi tidak dapat dikembalikan ke tahap sebelumnya.';
 end if;
 if (
   old.dibuka_pada is not null
@@ -401,7 +453,7 @@ or (
   old.ditutup_tx is not null
   and new.ditutup_tx is distinct
   from old.ditutup_tx
-) then raise exception ' Catatan pembukaan / penutupan sesi yang sudah tercatat tidak dapat diubah.';
+) then raise exception 'Catatan pembukaan / penutupan sesi yang sudah tercatat tidak dapat diubah.';
 end if;
 return new;
 end;
@@ -416,10 +468,10 @@ set search_path = public as $$ begin if exists (
     select 1
     from public.tb_sesi_voting s
     where s.id = 1
-      and s.status <> ' belum_mulai '
-  ) then raise exception ' Data kandidat dikunci karena sesi voting sudah dibuka.';
+      and s.status <> 'belum_mulai'
+  ) then raise exception 'Data kandidat dikunci karena sesi voting sudah dibuka.';
 end if;
-if tg_op = ' DELETE ' then return old;
+if tg_op = 'DELETE' then return old;
 end if;
 return new;
 end;
@@ -445,10 +497,10 @@ from public.tb_pengguna
 where id = auth.uid() for
 update;
 if not found
-or v_pengguna.role <> ' mahasiswa '
-or v_pengguna.status <> ' approved ' then raise exception ' Akun Anda tidak berhak memberikan suara.';
+or v_pengguna.role <> 'mahasiswa'
+or v_pengguna.status <> 'approved' then raise exception 'Akun Anda tidak berhak memberikan suara.';
 end if;
-if v_pengguna.has_voted then raise exception ' Anda sudah menggunakan hak suara.';
+if v_pengguna.has_voted then raise exception 'Anda sudah menggunakan hak suara.';
 end if;
 -- FOR SHARE: admin yang mengubah status sesi (mis. mulai menutup) menunggu suara yang
 -- sedang diproses selesai, dan suara berikutnya langsung melihat status baru. Tidak ada
@@ -457,19 +509,19 @@ select s.status into v_status_sesi
 from public.tb_sesi_voting s
 where s.id = 1 for share;
 if v_status_sesi is distinct
-from ' berlangsung ' then raise exception ' Sesi voting sedang tidak berlangsung.';
+from 'berlangsung' then raise exception 'Sesi voting sedang tidak berlangsung.';
 end if;
 select k.nomor_paslon into v_nomor
 from public.tb_kandidat k
 where k.id = p_kandidat_id;
-if v_nomor is null then raise exception ' Kandidat tidak ditemukan.';
+if v_nomor is null then raise exception 'Kandidat tidak ditemukan.';
 end if;
 update public.tb_pengguna
 set has_voted = true
 where id = v_pengguna.id;
 insert into public.tb_antrian_suara (nomor_paslon)
 values (v_nomor);
-return ' ok ';
+return 'ok';
 end;
 $$;
 revoke all on function public.fn_kirim_suara(uuid)
@@ -530,10 +582,10 @@ set search_path = public as $$
 declare v_jumlah integer;
 begin
 update public.tb_antrian_suara a
-set status = ' menunggu ',
+set status = 'menunggu',
   batch_id = null,
   diproses_pada = null
-where a.status = ' diproses '
+where a.status = 'diproses'
   and a.diproses_pada <= now() - make_interval(mins => p_ttl_menit);
 get diagnostics v_jumlah = row_count;
 return v_jumlah;
@@ -541,7 +593,7 @@ end;
 $$;
 -- Mengambil satu batch dalam URUTAN ACAK. Hanya mengambil jika jumlah yang menunggu
 -- mencapai p_min (agar satu suara tidak muncul sendirian di blockchain dan mudah
--- dicocokkan dengan waktu pemilihnya), KECUALI sesi sedang ' menutup ': saat itu semua
+-- dicocokkan dengan waktu pemilihnya), KECUALI sesi sedang 'menutup': saat itu semua
 -- sisa suara diambil berapa pun jumlahnya.
 create or replace function public.fn_ambil_batch_suara(p_batch_id uuid, p_min integer, p_maks integer) returns table (id_suara uuid, nomor integer) language plpgsql security definer
 set search_path = public as $$
@@ -553,30 +605,30 @@ select s.status into v_status
 from public.tb_sesi_voting s
 where s.id = 1;
 if v_status is distinct
-from ' berlangsung '
+from 'berlangsung'
   and v_status is distinct
-from ' menutup ' then return;
+from 'menutup' then return;
 end if;
 v_min := case
-  when v_status = ' menutup ' then 1
+  when v_status = 'menutup' then 1
   else greatest(p_min, 1)
 end;
 select count(*) into v_menunggu
 from public.tb_antrian_suara a
-where a.status = ' menunggu ';
+where a.status = 'menunggu';
 if v_menunggu < v_min then return;
 end if;
 return query with dipilih as (
   select a.id
   from public.tb_antrian_suara a
-  where a.status = ' menunggu '
+  where a.status = 'menunggu'
   order by random()
   limit greatest(p_maks, 1) for
   update skip locked
 ),
 diubah as (
   update public.tb_antrian_suara t
-  set status = ' diproses ',
+  set status = 'diproses',
     batch_id = p_batch_id,
     diproses_pada = now()
   from dipilih d
@@ -594,10 +646,10 @@ set search_path = public as $$
 declare v_jumlah integer;
 begin
 update public.tb_antrian_suara a
-set status = ' terkirim ',
+set status = 'terkirim',
   tx_hash = p_tx
 where a.batch_id = p_batch_id
-  and a.status = ' diproses ';
+  and a.status = 'diproses';
 get diagnostics v_jumlah = row_count;
 return v_jumlah;
 end;
@@ -607,11 +659,11 @@ set search_path = public as $$
 declare v_jumlah integer;
 begin
 update public.tb_antrian_suara a
-set status = ' menunggu ',
+set status = 'menunggu',
   batch_id = null,
   diproses_pada = null
 where a.batch_id = p_batch_id
-  and a.status = ' diproses ';
+  and a.status = 'diproses';
 get diagnostics v_jumlah = row_count;
 return v_jumlah;
 end;
@@ -884,11 +936,11 @@ insert into storage.buckets (
     allowed_mime_types
   )
 values (
-    ' foto - kandidat ',
-    ' foto - kandidat ',
+    'foto-kandidat',
+    'foto-kandidat',
     true,
     2097152,
-    array [' image / jpeg ', ' image / png ', ' image / webp ']
+    array ['image/jpeg', 'image/png', 'image/webp']
   ) on conflict (id) do
 update
 set public = excluded.public,
@@ -900,13 +952,63 @@ drop policy if exists "foto_kandidat: admin hapus" on storage.objects;
 -- Policy baca juga dibutuhkan agar admin bisa menghapus file (DELETE ... WHERE
 -- ikut memeriksa policy SELECT).
 create policy "foto_kandidat: publik baca" on storage.objects for
-select using (bucket_id = ' foto - kandidat ');
+select using (bucket_id = 'foto-kandidat');
 create policy "foto_kandidat: admin upload" on storage.objects for
 insert to authenticated with check (
-    bucket_id = ' foto - kandidat '
+    bucket_id = 'foto-kandidat'
     and public.is_admin()
   );
 create policy "foto_kandidat: admin hapus" on storage.objects for delete to authenticated using (
-  bucket_id = ' foto - kandidat '
+  bucket_id = 'foto-kandidat'
   and public.is_admin()
+);
+-- ---------------------------------------------------------
+-- 5. STORAGE: SCAN KTM MAHASISWA (bukti identitas saat registrasi)
+-- ---------------------------------------------------------
+-- Bucket PRIVAT (bukan publik) karena isinya dokumen identitas pribadi.
+-- Maks 200KB, hanya PDF. Setiap file disimpan di path "<user_id>/<nama_file>.pdf",
+-- sehingga satu mahasiswa hanya bisa upload/baca ke folder miliknya sendiri.
+insert into storage.buckets (
+    id,
+    name,
+    public,
+    file_size_limit,
+    allowed_mime_types
+  )
+values (
+    'ktm-mahasiswa',
+    'ktm-mahasiswa',
+    false,
+    204800,
+    array ['application/pdf']
+  ) on conflict (id) do
+update
+set public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+drop policy if exists "ktm_mahasiswa: upload folder sendiri" on storage.objects;
+drop policy if exists "ktm_mahasiswa: baca folder sendiri atau admin" on storage.objects;
+drop policy if exists "ktm_mahasiswa: hapus folder sendiri atau admin" on storage.objects;
+-- INSERT: hanya ke folder bernama persis uid milik user yang sedang login.
+create policy "ktm_mahasiswa: upload folder sendiri" on storage.objects for
+insert to authenticated with check (
+    bucket_id = 'ktm-mahasiswa'
+    and (storage.foldername(name)) [1] = auth.uid()::text
+  );
+-- SELECT: pemilik file sendiri, atau admin (untuk meninjau saat konfirmasi).
+create policy "ktm_mahasiswa: baca folder sendiri atau admin" on storage.objects for
+select to authenticated using (
+    bucket_id = 'ktm-mahasiswa'
+    and (
+      (storage.foldername(name)) [1] = auth.uid()::text
+      or public.is_admin()
+    )
+  );
+-- DELETE: pemilik file sendiri (untuk mengganti/upload ulang sebelum disetujui), atau admin.
+create policy "ktm_mahasiswa: hapus folder sendiri atau admin" on storage.objects for delete to authenticated using (
+  bucket_id = 'ktm-mahasiswa'
+  and (
+    (storage.foldername(name)) [1] = auth.uid()::text
+    or public.is_admin()
+  )
 );

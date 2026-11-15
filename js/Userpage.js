@@ -73,6 +73,7 @@ registerForm.addEventListener("submit", async (e) => {
   const email = document.getElementById("reg-email").value.trim();
   const password = document.getElementById("reg-password").value;
   const confirmPassword = document.getElementById("reg-confirm-password").value;
+  const fileKtm = document.getElementById("reg-ktm").files[0];
 
   if (password !== confirmPassword) {
     showStatus("register-status", "error", "Konfirmasi password tidak cocok.");
@@ -82,14 +83,24 @@ registerForm.addEventListener("submit", async (e) => {
     showStatus("register-status", "error", "Password minimal 6 karakter.");
     return;
   }
+  if (!fileKtm) {
+    showStatus("register-status", "error", "Scan KTM (PDF) wajib diunggah.");
+    return;
+  }
 
   registerSubmit.disabled = true;
   registerSubmit.textContent = "Memproses...";
 
-  const result = await Auth.registerMahasiswa({ nim, namaLengkap, email, password });
-
-  registerSubmit.disabled = false;
-  registerSubmit.textContent = "Daftar";
+  let result;
+  try {
+    result = await Auth.registerMahasiswa({ nim, namaLengkap, email, password, fileKtm });
+  } catch (err) {
+    console.error("Registrasi gagal:", err);
+    result = { success: false, message: "Terjadi kesalahan: " + (err?.message || err) };
+  } finally {
+    registerSubmit.disabled = false;
+    registerSubmit.textContent = "Daftar";
+  }
 
   showStatus("register-status", result.success ? "success" : "error", result.message);
 
