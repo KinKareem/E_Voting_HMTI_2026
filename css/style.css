@@ -41,24 +41,15 @@
   --page-pad: var(--pad);
   --font-display: var(--font);
   --wrap: 1440px;
-  /* gradient berlapis: dasar coklat gelap + cahaya emas (radial) + kilau lembut (radial) */
-  --grad-brand:
-    radial-gradient(50% 40% at 85% 12%, rgba(255, 214, 140, .22) 0%, rgba(255, 214, 140, 0) 100%),
-    radial-gradient(90% 70% at 0% 0%, rgba(226, 152, 58, .55) 0%, rgba(226, 152, 58, 0) 60%),
-    radial-gradient(80% 60% at 100% 100%, rgba(141, 88, 21, .55) 0%, rgba(141, 88, 21, 0) 65%),
-    linear-gradient(165deg, #4a2a14 0%, #2a170a 100%);
-  --grad-side:
-    radial-gradient(120% 45% at 50% 0%, rgba(226, 152, 58, .42) 0%, rgba(226, 152, 58, 0) 70%),
-    radial-gradient(110% 40% at 50% 100%, rgba(141, 88, 21, .35) 0%, rgba(141, 88, 21, 0) 70%),
-    linear-gradient(180deg, #3d2211 0%, #25130a 100%);
-  --grad-bar:
-    radial-gradient(45% 260% at 92% 0%, rgba(226, 152, 58, .5) 0%, rgba(226, 152, 58, 0) 70%),
-    radial-gradient(40% 240% at 4% 100%, rgba(141, 88, 21, .4) 0%, rgba(141, 88, 21, 0) 70%),
-    linear-gradient(180deg, #3a2110 0%, #2a170a 100%);
-  --grad-foot:
-    radial-gradient(60% 90% at 100% 0%, rgba(226, 152, 58, .38) 0%, rgba(226, 152, 58, 0) 65%),
-    radial-gradient(55% 80% at 0% 100%, rgba(141, 88, 21, .35) 0%, rgba(141, 88, 21, 0) 70%),
-    linear-gradient(170deg, #3a2110 0%, #251309 100%);
+  /* warna emas mengikuti contoh tombol dari desain: atas #B57429 (rata ~24%) turun ke #8C5A1E, garis tepi #6B430E — sudah digelapkan dari versi awal */
+  --gold-a: #B57429;
+  --gold-b: #8C5A1E;
+  --gold-edge: #6B430E;
+  --on-gold: #ffffff;
+  --grad-brand: linear-gradient(180deg, #B57429 0%, #B57429 24%, #8C5A1E 100%);
+  --grad-side: linear-gradient(180deg, #B57429 0%, #B57429 24%, #8C5A1E 100%);
+  --grad-bar: linear-gradient(180deg, #B57429 0%, #B57429 24%, #8C5A1E 100%);
+  --grad-foot: linear-gradient(180deg, #B57429 0%, #B57429 24%, #8C5A1E 100%);
   --font-body: var(--font);
 }
 
@@ -1727,6 +1718,12 @@ table.data-table td.muted {
   color: #b91c1c;
 }
 
+/* Status relayer "Siaga": kuning/amber, dibedakan dari aktif (hijau) dan bermasalah (merah) */
+#relayer-live[data-state="idle"] {
+  color: #b7791f;
+  font-weight: 500;
+}
+
 .relayer-form {
   margin-top: 20px;
   padding-top: 18px;
@@ -2764,12 +2761,15 @@ code {
   font-family: var(--font)
 }
 
-/* ---------- BINGKAI ORNAMEN halaman login admin, login user & lupa password ---------- */
+/* ---------- BINGKAI ORNAMEN halaman login admin, login user & lupa password ----------
+   Desain baru (Figma 1920x1080): 4 pojok (Layer), 2 lengkung bawah (LENGKUNG), 1 ornamen tengah bawah.
+   --u = ukuran 1 "piksel desain" mengikuti lebar layar (1920px lebar = .75px). Ubah angka .75 untuk membesar/mengecilkan seluruh bingkai. Semua ukuran/posisi di bawah
+   adalah angka dari desain Figma dikali --u, sehingga bingkai ikut mengecil/membesar proporsional. */
 .auth-page {
-  --u: clamp(18px, min(2.6vw, 4.2vh), 60px);
+  --u: clamp(.225px, calc(100vw / 1920 * .75), .83px);
   position: relative;
   overflow: hidden;
-  padding: calc(var(--u) * 2.6 + 8px) calc(var(--u) + 14px) calc(var(--u) * 2.2 + 8px)
+  padding: 16px 24px calc(var(--u) * 191 + 6px)
 }
 
 .auth-page::before {
@@ -2779,16 +2779,20 @@ code {
   z-index: 0;
   pointer-events: none;
   background:
-    url("frame/corner.png") no-repeat left calc(var(--u) * -.8) top calc(var(--u) * -.575) / calc(var(--u) * 3.6) auto,
-    url("frame/corner.png") no-repeat right calc(var(--u) * -.8) top calc(var(--u) * -.575) / calc(var(--u) * 3.6) auto,
-    url("frame/corner.png") no-repeat left calc(var(--u) * -.8) bottom calc(var(--u) * -.575) / calc(var(--u) * 3.6) auto,
-    url("frame/corner.png") no-repeat right calc(var(--u) * -.8) bottom calc(var(--u) * -.575) / calc(var(--u) * 3.6) auto,
-    url("frame/top-center.png") no-repeat 50% calc(var(--u) * -.6) / calc(var(--u) * 4.3) auto,
-    url("frame/bottom-center.png") no-repeat 50% 100% / calc(var(--u) * 5.5) auto,
-    url("frame/border-h.png") repeat-x left top / auto var(--u),
-    url("frame/border-h.png") repeat-x left bottom / auto var(--u),
-    url("frame/border-l.png") repeat-y left top / var(--u) auto,
-    url("frame/border-r.png") repeat-y right top / var(--u) auto
+    url("frame/corner-tl.png") no-repeat left calc(var(--u) * -4) top calc(var(--u) * -3) / calc(var(--u) * 221) calc(var(--u) * 234),
+    url("frame/corner-tr.png") no-repeat right calc(var(--u) * -4) top calc(var(--u) * -3) / calc(var(--u) * 221) calc(var(--u) * 234),
+    url("frame/corner-bl.png") no-repeat left calc(var(--u) * -4) bottom calc(var(--u) * -3) / calc(var(--u) * 231) calc(var(--u) * 236),
+    url("frame/corner-br.png") no-repeat right calc(var(--u) * -4) bottom calc(var(--u) * -3) / calc(var(--u) * 234) calc(var(--u) * 236),
+    url("frame/center.png") no-repeat 50% calc(100% + var(--u) * 136) / calc(var(--u) * 640) calc(var(--u) * 324),
+    url("frame/arc-l.png") no-repeat left 0 bottom 0 / calc(50% + var(--u) * 40) calc(var(--u) * 152),
+    url("frame/arc-r.png") no-repeat right 0 bottom 0 / calc(50% + var(--u) * 40) calc(var(--u) * 148)
+}
+
+/* layar < 1280px: pojok atas ikut membesar relatif terhadap card, beri ruang di atas agar tidak menimpa card */
+@media (max-width: 1279px) {
+  .auth-page {
+    padding-top: calc(var(--u) * 236 + 6px)
+  }
 }
 
 .auth-card,
@@ -2837,10 +2841,6 @@ code {
 
 /* layar desktop pendek (laptop kecil): ringkaskan lagi supaya form Daftar tetap muat tanpa scroll */
 @media (min-width: 861px) and (max-height: 800px) {
-  .auth-page {
-    --u: clamp(16px, min(2.2vw, 3.6vh), 40px)
-  }
-
   .form-panel {
     padding: 16px 28px
   }
@@ -2931,7 +2931,7 @@ code {
   #sidebar-root {
     flex: 0 0 272px;
     min-height: 100vh;
-    background: #2f1a0d
+    background: #c98a2f
   }
 }
 
@@ -2953,4 +2953,165 @@ code {
 .btn-link:disabled {
   opacity: 0.5;
   cursor: wait;
+}
+
+/* ---------- BINGKAI ORNAMEN panggung Hasil Voting (admin/hasil-voting.html) ----------
+   Memakai 7 gambar yang sama dengan bingkai halaman login (folder css/frame/), tetapi dipasang di
+   dalam PANGGUNG peragaan (.hv-stage), bukan di halaman admin. Ikut tampil saat layar penuh.
+   Ukuran bingkai mengikuti LEBAR PANGGUNG (bukan lebar layar), karena panggung lebih sempit dari
+   layar di mode biasa dan selebar layar di mode layar penuh.
+   Ubah --hv-frame-scale untuk membesarkan/mengecilkan seluruh bingkai (bawaan .75 = sama seperti login). */
+.hv-stage {
+  --hv-frame-scale: .75;
+  --u: clamp(.2px, calc(100cqw / 1920 * var(--hv-frame-scale)), 1.2px);
+  container-type: inline-size
+}
+
+/* peramban lama tanpa container query: pakai lebar layar */
+@supports not (width: 1cqw) {
+  .hv-stage {
+    --u: clamp(.2px, calc(100vw / 1920 * var(--hv-frame-scale)), 1.2px)
+  }
+}
+
+.hv-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    url("frame/corner-tl.png") no-repeat left calc(var(--u) * -4) top calc(var(--u) * -3) / calc(var(--u) * 221) calc(var(--u) * 234),
+    url("frame/corner-tr.png") no-repeat right calc(var(--u) * -4) top calc(var(--u) * -3) / calc(var(--u) * 221) calc(var(--u) * 234),
+    url("frame/corner-bl.png") no-repeat left calc(var(--u) * -4) bottom calc(var(--u) * -3) / calc(var(--u) * 231) calc(var(--u) * 236),
+    url("frame/corner-br.png") no-repeat right calc(var(--u) * -4) bottom calc(var(--u) * -3) / calc(var(--u) * 234) calc(var(--u) * 236),
+    url("frame/center.png") no-repeat 50% calc(100% + var(--u) * 136) / calc(var(--u) * 640) calc(var(--u) * 324),
+    url("frame/arc-l.png") no-repeat left 0 bottom 0 / calc(50% + var(--u) * 40) calc(var(--u) * 152),
+    url("frame/arc-r.png") no-repeat right 0 bottom 0 / calc(50% + var(--u) * 40) calc(var(--u) * 148)
+}
+
+/* sisakan ruang di bawah grafik agar batang tidak menimpa lengkung & ornamen tengah bawah */
+.hv-chart {
+  margin-bottom: calc(var(--u) * 191 + 6px)
+}
+
+/* tombol "Putar ulang" & "Layar penuh" digeser ke dalam supaya tidak menumpuk di atas ornamen pojok */
+.hv-replay {
+  left: calc(var(--u) * 232 + 8px)
+}
+
+.hv-fs {
+  right: calc(var(--u) * 232 + 8px)
+}
+
+/* =========================================================
+   TEMA EMAS: teks putih di atas gradient emas #B57429 -> #8C5A1E (versi gelap dari desain awal).
+   Bayangan tipis berwarna coklat emas (#6B430E) membantu keterbacaan teks kecil.
+   ========================================================= */
+
+/* ---- panel emas di card login ---- */
+.brand-eyebrow {
+  color: rgba(255, 255, 255, .92);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .55)
+}
+
+.brand-title {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(139, 86, 16, .5)
+}
+
+.brand-description {
+  color: rgba(255, 255, 255, .95);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .5)
+}
+
+.brand-footer {
+  color: rgba(255, 255, 255, .88);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .5)
+}
+
+.brand-panel .gold-rule {
+  background: #fff
+}
+
+/* ---- sidebar admin ---- */
+.sidebar {
+  color: #fff;
+  border-right: 2px solid var(--gold-edge)
+}
+
+.sidebar-eyebrow {
+  color: rgba(255, 255, 255, .9)
+}
+
+.sidebar-title {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(139, 86, 16, .5);
+  text-align: left
+}
+
+.sidebar-rule {
+  background: rgba(255, 255, 255, .35)
+}
+
+.sidebar-link {
+  color: rgba(255, 255, 255, .95);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .45)
+}
+
+.sidebar-link:hover {
+  background: rgba(139, 86, 16, .28);
+  color: #fff
+}
+
+.sidebar-link.active {
+  background: var(--gold-edge);
+  color: #fff;
+  text-shadow: none
+}
+
+.sidebar-link.active svg {
+  color: #fff
+}
+
+.sidebar-credit {
+  background: rgba(139, 86, 16, .3)
+}
+
+.sidebar-credit p {
+  color: #fff
+}
+
+.sidebar-logout {
+  border-color: rgba(255, 255, 255, .6);
+  color: #fff
+}
+
+.sidebar-logout:hover {
+  background: var(--gold-edge);
+  border-color: var(--gold-edge);
+  color: #fff
+}
+
+/* ---- logo SMFT dihapus dari header sidebar (tinggal logo HMTI + judul, rata kiri) ---- */
+.sidebar-header .logo-tile:has(img[src*="smft" i]) {
+  display: none
+}
+
+.sidebar-brand {
+  justify-content: flex-start;
+  text-align: left
+}
+
+/* logo di panel emas halaman login (index & admin): tanpa kotak/border putih, logo transparan langsung di atas gradient */
+.brand-panel .brand-logo {
+  padding: 0;
+  background: none;
+  border-radius: 0
+}
+
+/* bayangan putih di semua logo (login, header, footer, sidebar) — logonya gelap, jadi butuh shadow terang supaya tidak menyatu dengan background gradient yang gelap */
+.brand-logo,
+.logo-tile img {
+  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, .5)) drop-shadow(0 3px 8px rgba(255, 255, 255, .3))
 }

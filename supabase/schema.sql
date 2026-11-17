@@ -173,6 +173,9 @@ create table if not exists public.tb_sesi_voting (
   ditutup_pada timestamptz,
   ditutup_oleh text,
   ditutup_tx text,
+  -- true setelah admin menekan "Lihat Hasil Pemilihan" di halaman Hasil Voting;
+  -- landing page baru menampilkan hasil akhir setelah ini true
+  hasil_dibuka boolean not null default false,
   diperbarui_pada timestamptz not null default now()
 );
 insert into public.tb_sesi_voting (id)
@@ -188,6 +191,9 @@ add constraint tb_sesi_voting_status_check check (
       'selesai'
     )
   );
+-- Untuk database lama yang tb_sesi_voting-nya dibuat sebelum ada kolom hasil_dibuka.
+alter table public.tb_sesi_voting
+add column if not exists hasil_dibuka boolean not null default false;
 -- Antrian suara yang menunggu dikirim relayer ke blockchain.
 -- SENGAJA tidak ada kolom pemilih dan tidak ada waktu pembuatan: urutan masuk dan waktu
 -- memilih tidak boleh bisa dicocokkan dengan urutan di blockchain. Kolom id adalah ID
@@ -216,7 +222,7 @@ create table if not exists public.tb_status_relayer (
 insert into public.tb_status_relayer (id)
 values (1) on conflict (id) do nothing;
 -- Pengaturan & ingatan relayer otomatis (Edge Function "relayer"):
---   aktif         : saklar dari halaman Sesi Voting (false = relayer dijeda)
+--   aktif         : TIDAK DIPAKAI LAGI (saklar relayer sudah dihapus); kolom dibiarkan, bernilai true
 --   terakhir_coba : kapan relayer terakhir mencoba mengirim batch (untuk selang INTERVAL_MENIT)
 --   kunci_sampai  : kunci anti-tumpang-tindih antar siklus (lihat fn_ambil_kunci_relayer)
 alter table public.tb_status_relayer
@@ -282,6 +288,24 @@ revoke all on function public.get_email_by_nim(text)
 from public;
 grant execute on function public.get_email_by_nim(text) to anon,
   authenticated;
+-- Apakah pendaftaran mahasiswa baru sedang dibuka? Ditutup selama sesi voting 'berlangsung' atau
+-- 'menutup' untuk mencegah pendaftaran ilegal; dibuka lagi saat 'belum_mulai' atau 'selesai'.
+-- Boleh dipanggil siapa saja (halaman pendaftaran memakainya sebelum membuat akun login).
+create or replace function public.fn_pendaftaran_dibuka() returns boolean language sql stable security definer
+set search_path = public as $$
+select coalesce(
+    (
+      select status
+      from public.tb_sesi_voting
+      where id = 1
+    ) not in ('berlangsung', 'menutup'),
+    true
+  );
+$$;
+revoke all on function public.fn_pendaftaran_dibuka()
+from public;
+grant execute on function public.fn_pendaftaran_dibuka() to anon,
+  authenticated;
 -- Pendaftaran mahasiswa: mengaitkan akun login yang baru dibuat dengan baris tb_pengguna
 -- yang sudah ada (berdasarkan NIM). Jika NIM belum ada, dibuat baris baru. Status tetap 'pending' sampai admin menyetujui.
 -- p_ktm_path: path file KTM (PDF) di storage bucket "ktm-mahasiswa", yang diupload
@@ -297,6 +321,8 @@ set search_path = public as $$
 declare v_uid uuid := auth.uid();
 v_row public.tb_pengguna %rowtype;
 begin if v_uid is null then raise exception 'Anda harus login untuk menyelesaikan pendaftaran.';
+end if;
+if not public.fn_pendaftaran_dibuka() then raise exception 'Pendaftaran ditutup selama sesi voting berlangsung.';
 end if;
 if p_ktm_path is null
 or length(trim(p_ktm_path)) = 0 then raise exception 'Scan KTM (PDF) wajib diunggah.';
@@ -352,6 +378,21 @@ $$;
 revoke all on function public.fn_daftar_mahasiswa(text, text, text, text)
 from public;
 grant execute on function public.fn_daftar_mahasiswa(text, text, text, text) to authenticated;
+-- Penjaga jalur langsung: policy "daftar akun sendiri" mengizinkan pengguna login meng-insert baris
+-- dirinya tanpa lewat fn_daftar_mahasiswa, jadi INSERT mahasiswa baru juga ditolak saat pendaftaran
+-- ditutup. Admin dan SQL Editor (tanpa login) tidak terkena, sehingga impor data tetap bisa.
+create or replace function public.fn_tutup_pendaftaran_saat_sesi() returns trigger language plpgsql security definer
+set search_path = public as $$ begin if new.role = 'mahasiswa'
+  and auth.uid() is not null
+  and not public.is_admin()
+  and not public.fn_pendaftaran_dibuka() then raise exception 'Pendaftaran ditutup selama sesi voting berlangsung.';
+end if;
+return new;
+end;
+$$;
+drop trigger if exists trg_tutup_pendaftaran_saat_sesi on public.tb_pengguna;
+create trigger trg_tutup_pendaftaran_saat_sesi before
+insert on public.tb_pengguna for each row execute function public.fn_tutup_pendaftaran_saat_sesi();
 -- Dipanggil admin saat menolak pendaftaran mahasiswa. Menghapus file KTM di storage,
 -- lalu menghapus akun di auth.users -- yang lewat trigger trg_hapus_pengguna_auth
 -- (sudah ada di atas) otomatis ikut menghapus baris tb_pengguna-nya juga.
@@ -681,16 +722,9 @@ grant execute on function public.fn_ambil_batch_suara(uuid, integer, integer) to
 grant execute on function public.fn_tandai_batch_terkirim(uuid, text) to service_role;
 grant execute on function public.fn_lepas_batch(uuid) to service_role;
 -- ---- Relayer otomatis (Edge Function "relayer") ----
--- Saklar relayer dari halaman admin. Hanya admin; tabelnya sendiri tidak bisa ditulis lewat RLS.
-create or replace function public.fn_set_relayer_aktif(p_aktif boolean) returns boolean language plpgsql security definer
-set search_path = public as $$ begin if not public.is_admin() then raise exception 'Hanya admin yang boleh mengubah pengaturan relayer.';
-end if;
-update public.tb_status_relayer
-set aktif = p_aktif
-where id = 1;
-return p_aktif;
-end;
-$$;
+-- Saklar relayer sudah dihapus (relayer otomatis aktif selama sesi berlangsung/menutup).
+-- Baris di bawah membersihkan fungsinya dari database lama.
+drop function if exists public.fn_set_relayer_aktif(boolean);
 -- Kunci anti-tumpang-tindih: satu siklus relayer pada satu waktu (penjadwal + tombol admin
 -- bisa terjadi bersamaan). Kunci kedaluwarsa sendiri setelah p_detik jika siklus mati di tengah jalan.
 create or replace function public.fn_ambil_kunci_relayer(p_detik integer) returns boolean language plpgsql security definer
@@ -715,10 +749,6 @@ set kunci_sampai = null
 where id = 1;
 end;
 $$;
-revoke all on function public.fn_set_relayer_aktif(boolean)
-from public,
-  anon;
-grant execute on function public.fn_set_relayer_aktif(boolean) to authenticated;
 revoke all on function public.fn_ambil_kunci_relayer(integer)
 from public,
   anon,
@@ -783,6 +813,7 @@ set status = 'belum_mulai',
   ditutup_pada = null,
   ditutup_oleh = null,
   ditutup_tx = null,
+  hasil_dibuka = false,
   diperbarui_pada = now()
 where id = 1;
 alter table public.tb_sesi_voting enable trigger trg_jaga_transisi_sesi;

@@ -418,52 +418,48 @@ body {
 
 #kandidat .kandidat-grid:has(.kandidat-card:nth-child(4):last-child) {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px
+  gap: 28px
 }
 
-#kandidat .kandidat-grid:has(.kandidat-card:nth-child(2):last-child) .kandidat-card {
-  flex-direction: row
-}
-
-#kandidat .kandidat-grid:has(.kandidat-card:nth-child(2):last-child) .kandidat-photo {
-  flex: 0 0 42%;
-  aspect-ratio: auto;
-  min-height: 340px
-}
-
+/* Desain kartu kandidat: foto/pigura (template 2.png: foto + nomor + nama sudah ada di gambar)
+   dibiarkan utuh, tidak dipotong, dan menimpa tepi atas kartu putih.
+   Angka 12.8% = seberapa jauh gambar menimpa kartu (persen dari lebar kartu).
+   Lebar gambar 94% (bukan 100%+) supaya ornamen antar kartu tidak saling menempel. */
 #kandidat .kandidat-card {
   display: flex;
   flex-direction: column;
-  background: var(--card);
-  border-radius: 22px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  box-shadow: 0 20px 40px -28px rgba(70, 40, 20, .45)
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible
 }
 
 #kandidat .kandidat-photo {
   position: relative;
+  z-index: 2;
+  flex: none;
+  width: 94%;
+  margin: 0 3% -12.8%;
+  aspect-ratio: auto;
+  min-height: 0;
   border: 0;
-  aspect-ratio: 4/4.4;
-  background: var(--mist);
-  overflow: hidden
+  background: none;
+  overflow: visible;
+  pointer-events: none
 }
 
 #kandidat .kandidat-photo img {
-  position: absolute;
-  inset: 0;
+  position: static;
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover
-}
-
-#kandidat .kandidat-body {
-  min-width: 0
+  height: auto;
+  object-fit: contain
 }
 
 #kandidat .kandidat-photo-empty {
   width: 100%;
-  height: 100%;
+  aspect-ratio: 536/528;
   display: grid;
   place-items: center;
   color: rgba(70, 40, 20, .35)
@@ -474,27 +470,23 @@ body {
   height: auto
 }
 
+/* nomor dari sistem disembunyikan, nomor sudah ada di gambar pigura */
 #kandidat .kandidat-number {
-  position: absolute;
-  left: 16px;
-  top: 16px;
-  min-width: 48px;
-  height: 48px;
-  padding: 0 12px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: var(--ink);
-  color: var(--gold);
-  font-weight: 700;
-  font-size: 20px
+  display: none
 }
 
 #kandidat .kandidat-body {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: 22px
+  min-width: 0;
+  padding: calc(12.8% + 22px) 22px 22px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: 0 20px 40px -28px rgba(70, 40, 20, .45)
 }
 
 #kandidat .kandidat-role {
@@ -1097,17 +1089,8 @@ body {
   }
 
   #kandidat .kandidat-grid {
-    grid-template-columns: 1fr !important
-  }
-
-  #kandidat .kandidat-card {
-    flex-direction: row !important
-  }
-
-  #kandidat .kandidat-photo {
-    flex: 0 0 40% !important;
-    aspect-ratio: auto !important;
-    min-height: 300px !important
+    grid-template-columns: minmax(0, 420px) !important;
+    justify-content: center
   }
 
   .footer-grid {
@@ -1120,16 +1103,6 @@ body {
 }
 
 @media(max-width:600px) {
-  #kandidat .kandidat-card {
-    flex-direction: column !important
-  }
-
-  #kandidat .kandidat-photo {
-    flex: none !important;
-    aspect-ratio: 4/3.4 !important;
-    min-height: 0 !important
-  }
-
   .footer-grid {
     grid-template-columns: 1fr
   }
@@ -1156,4 +1129,107 @@ body {
 .landing-header .logo-tile img {
   width: 48px;
   height: 48px
+}
+
+/* =========================================================
+   TEMA EMAS: header & footer memakai gradient emas #E2983A -> #B17325 (sesuai contoh desain),
+   teks putih dengan garis tepi #8B5610.
+   ========================================================= */
+.landing-header {
+  border-bottom: 2px solid var(--gold-edge)
+}
+
+.landing-footer {
+  border-top: 2px solid var(--gold-edge);
+  color: #fff
+}
+
+.brand-mark {
+  color: #fff
+}
+
+.brand-mark-eyebrow {
+  color: rgba(255, 255, 255, .92);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .55)
+}
+
+.brand-mark-title {
+  text-shadow: 0 1px 3px rgba(139, 86, 16, .5)
+}
+
+.landing-nav a {
+  color: rgba(255, 255, 255, .95);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .5)
+}
+
+.landing-nav a:hover {
+  background: rgba(139, 86, 16, .3);
+  color: #fff
+}
+
+.user-avatar {
+  background: var(--gold-edge);
+  color: #fff
+}
+
+.user-name {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .5)
+}
+
+.user-nim {
+  color: rgba(255, 255, 255, .9);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .5)
+}
+
+.btn-header-logout {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .65)
+}
+
+.btn-header-logout:hover {
+  background: var(--gold-edge);
+  border-color: var(--gold-edge);
+  color: #fff
+}
+
+.footer-brand,
+.footer-col h4 {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(139, 86, 16, .5)
+}
+
+.footer-text,
+.footer-links a,
+.footer-contact a,
+.footer-contact li {
+  color: rgba(255, 255, 255, .95);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .5)
+}
+
+.footer-links a:hover,
+.footer-contact a:hover {
+  color: #fff;
+  text-decoration: underline
+}
+
+.footer-contact svg {
+  color: #fff
+}
+
+.footer-social a {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .65)
+}
+
+.footer-social a:hover {
+  background: var(--gold-edge);
+  border-color: var(--gold-edge);
+  color: #fff
+}
+
+.footer-copy {
+  color: rgba(255, 255, 255, .9);
+  border-top-color: rgba(255, 255, 255, .35);
+  text-shadow: 0 1px 2px rgba(139, 86, 16, .5)
 }

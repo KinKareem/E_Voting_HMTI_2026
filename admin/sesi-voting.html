@@ -142,18 +142,13 @@
           </dl>
 
           <div class="relayer-controls">
-            <label class="switch" for="relayer-toggle">
-              <input type="checkbox" id="relayer-toggle" checked disabled />
-              <span class="switch-track" aria-hidden="true"></span>
-              <span class="switch-label" id="relayer-toggle-label">Relayer otomatis aktif</span>
-            </label>
             <div class="relayer-buttons">
               <button type="button" class="btn-outline" id="btn-relayer-cek">Periksa relayer</button>
               <button type="button" class="btn-outline" id="btn-relayer-kirim" disabled>Kirim sekarang</button>
             </div>
             <p class="panel-note" id="relayer-ctl-hint">
-              Relayer berjalan otomatis (dipanggil tiap menit) selama sesi voting berlangsung. Gunakan
-              saklar hanya jika perlu menjeda pengiriman suara ke blockchain.
+              Relayer berjalan otomatis (dipanggil tiap menit) sejak sesi voting dimulai dan berhenti
+              sendiri setelah sesi ditutup.
             </p>
           </div>
 

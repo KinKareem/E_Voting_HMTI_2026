@@ -34,6 +34,7 @@ let chainState = null; // keadaan lengkap dari blockchain (null jika belum terba
 let ringkasanSebelum = null; // ringkasan jumlah suara dibaca SEBELUM membaca blockchain
 let ringkasanSesudah = null; // ... dan SESUDAH membaca blockchain
 let hasilTampil = false; // hasil akhir sudah digambar
+let hasilDibuka = false; // admin sudah menekan "Lihat Hasil Pemilihan" (tb_sesi_voting.hasil_dibuka)
 let kandidatAnimated = false;
 let logAnimated = false;
 
@@ -121,7 +122,8 @@ async function init() {
   // Segarkan status sesi & riwayat secara berkala (admin bisa membuka/menutup sesi kapan saja)
   setInterval(async () => {
     if (document.hidden) return;
-    await Promise.all([loadSesi(), refreshTransparansi()]);
+    await loadSesi(); // harus selesai dulu agar hasilDibuka terbaru terbaca oleh loadHasil
+    await refreshTransparansi();
   }, LOG_REFRESH_MS);
 }
 
@@ -205,6 +207,7 @@ function updateVoteState() {
 async function loadSesi() {
   const { data, error } = await sb.from("tb_sesi_voting").select("*").eq("id", 1).single();
   sesiStatus = error || !data ? null : data.status;
+  hasilDibuka = !!(data && data.hasil_dibuka);
   updateVoteState();
   updateChainNote();
 }
@@ -588,7 +591,7 @@ function updateVerify() {
 
 // Hasil akhir: dibaca dari kontrak setelah sesi ditutup, nama paslon dari database.
 async function loadHasil() {
-  if (!chainState || chainState.status !== 2) {
+  if (!chainState || chainState.status !== 2 || !hasilDibuka) {
     el.hasilSection.classList.add("hidden");
     return;
   }

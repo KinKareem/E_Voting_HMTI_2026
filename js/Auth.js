@@ -8,8 +8,39 @@
 
 const Auth = {
 
+  // Apakah pendaftaran mahasiswa baru sedang dibuka? Ditutup selama sesi voting berlangsung/menutup
+  // (lihat supabase/patch_tutup_pendaftaran.sql). Hasil: { dibuka: true | false | null, pesan }.
+  // dibuka === null berarti statusnya tidak bisa diperiksa; dianggap TUTUP demi keamanan.
+  async cekPendaftaranDibuka() {
+    try {
+      const { data, error } = await sb.rpc("fn_pendaftaran_dibuka");
+      if (error || typeof data !== "boolean") {
+        return {
+          dibuka: null,
+          pesan: "Status pendaftaran tidak dapat diperiksa saat ini. Muat ulang halaman atau coba lagi nanti.",
+        };
+      }
+      return {
+        dibuka: data,
+        pesan: data ? "" : "Pendaftaran akun baru ditutup selama sesi voting berlangsung.",
+      };
+    } catch (_) {
+      return {
+        dibuka: null,
+        pesan: "Status pendaftaran tidak dapat diperiksa saat ini. Muat ulang halaman atau coba lagi nanti.",
+      };
+    }
+  },
+
   // fileKtm: objek File dari <input type="file">, berisi scan KTM dalam format PDF (maks 200KB).
   async registerMahasiswa({ nim, namaLengkap, email, password, fileKtm }) {
+    // Cek PERTAMA, sebelum akun login dibuat, supaya tidak ada akun kosong saat pendaftaran ditutup.
+    // Database tetap menolak sendiri (fn_daftar_mahasiswa + trigger) kalau pemeriksaan ini dilewati.
+    const status = await Auth.cekPendaftaranDibuka();
+    if (status.dibuka !== true) {
+      return { success: false, message: status.pesan };
+    }
+
     if (!fileKtm) {
       return { success: false, message: "Scan KTM (PDF) wajib diunggah." };
     }

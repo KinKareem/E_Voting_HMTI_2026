@@ -286,6 +286,16 @@ function tampilkanKeadaan(data) {
 }
 
 // =========================================================
+// BUKA HASIL DI HALAMAN PEMILIH
+// =========================================================
+// Menandai di database bahwa hasil boleh tampil di landing (kolom tb_sesi_voting.hasil_dibuka).
+// Dipanggil setelah animasi pengumuman selesai.
+async function bukaHasilDiLanding() {
+  const { error } = await sb.from("tb_sesi_voting").update({ hasil_dibuka: true }).eq("id", 1);
+  if (error) showToastSafe(`Gagal membuka hasil di halaman pemilih: ${error.message}`);
+}
+
+// =========================================================
 // ANIMASI
 // =========================================================
 function tunggu(ms) {
@@ -410,6 +420,7 @@ async function mainkan() {
     await tunggu(T.pemenang);
     await umumkan();
     el.stage.classList.add("selesai");
+    await bukaHasilDiLanding(); // hasil baru muncul di landing setelah pengumuman selesai
   } finally {
     sedangMain = false;
     el.chart.classList.remove("tegang");

@@ -18,7 +18,10 @@ function setAuthMode(mode) {
 }
 
 tabLogin.addEventListener("click", () => setAuthMode("login"));
-tabRegister.addEventListener("click", () => setAuthMode("register"));
+tabRegister.addEventListener("click", () => {
+  setAuthMode("register");
+  perbaruiStatusPendaftaran(); // status sesi bisa berubah sejak halaman dibuka
+});
 
 // --- Helper tampilkan pesan status (sukses/error) ---
 function showStatus(elementId, type, message) {
@@ -63,10 +66,32 @@ loginForm.addEventListener("submit", async (e) => {
 // --- Form REGISTER ---
 const registerForm = document.getElementById("register-form");
 const registerSubmit = document.getElementById("register-submit");
+const registerClosed = document.getElementById("register-closed");
+
+// Pendaftaran ditutup selama sesi voting berlangsung (mencegah pendaftaran ilegal).
+// Form dikunci di sini; penegakan sebenarnya ada di database (fn_daftar_mahasiswa + trigger).
+let pendaftaranDibuka = true;
+
+async function perbaruiStatusPendaftaran() {
+  const status = await Auth.cekPendaftaranDibuka();
+  pendaftaranDibuka = status.dibuka === true;
+
+  registerClosed.textContent = status.pesan;
+  registerClosed.classList.toggle("hidden", pendaftaranDibuka);
+
+  registerForm.querySelectorAll("input").forEach((input) => {
+    input.disabled = !pendaftaranDibuka;
+  });
+  registerSubmit.disabled = !pendaftaranDibuka;
+  registerSubmit.textContent = pendaftaranDibuka ? "Daftar" : "Pendaftaran Ditutup";
+}
+
+perbaruiStatusPendaftaran();
 
 registerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   hideStatus("register-status");
+  if (!pendaftaranDibuka) return;
 
   const nim = document.getElementById("reg-nim").value.trim();
   const namaLengkap = document.getElementById("reg-nama").value.trim();
@@ -107,5 +132,8 @@ registerForm.addEventListener("submit", async (e) => {
   if (result.success) {
     registerForm.reset();
     setTimeout(() => setAuthMode("login"), 1500);
+  } else {
+    // Mungkin gagal karena sesi baru saja dimulai: sinkronkan tampilan form.
+    await perbaruiStatusPendaftaran();
   }
 });

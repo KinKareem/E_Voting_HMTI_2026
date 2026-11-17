@@ -111,8 +111,6 @@ const el = {
   relayerInput: byId("relayer-input"),
   btnSetRelayer: byId("btn-set-relayer"),
   relayerHint: byId("relayer-hint"),
-  relayerToggle: byId("relayer-toggle"),
-  relayerToggleLabel: byId("relayer-toggle-label"),
   btnRelayerCek: byId("btn-relayer-cek"),
   btnRelayerKirim: byId("btn-relayer-kirim"),
   relayerCtlHint: byId("relayer-ctl-hint"),
@@ -631,10 +629,7 @@ function relayerHealth() {
   const parts = [];
   let state = "ok";
 
-  if (relayerRow.aktif === false) {
-    state = "bad";
-    parts.push("DIJEDA — suara tidak dikirim ke blockchain sampai relayer dilanjutkan");
-  } else if (sesiBerjalanDb()) {
+  if (sesiBerjalanDb()) {
     if (umur > RELAYER_STALE_MS) {
       state = "bad";
       parts.push(`Tidak aktif — terakhir terdeteksi ${relativeTime(relayerRow.terakhir_aktif)}`);
@@ -1202,9 +1197,6 @@ async function callRelayer(aksi) {
 async function prepareOpen() {
   setStep("relayer", "active");
   await loadRelayerRow();
-  if (relayerRow && relayerRow.aktif === false) {
-    throw new Error("Relayer sedang dijeda. Nyalakan kembali saklar relayer di panel Relayer, lalu coba lagi.");
-  }
 
   let hasil;
   try {
@@ -1228,21 +1220,14 @@ async function prepareOpen() {
 }
 
 function renderRelayerControls() {
-  const ada = !!relayerRow;
-  const aktif = ada ? relayerRow.aktif !== false : true;
   const berjalan = sesiBerjalanDb();
 
-  el.relayerToggle.checked = aktif;
-  el.relayerToggle.disabled = !ada || busy || relayerBusy;
-  el.relayerToggleLabel.textContent = aktif ? "Relayer otomatis aktif" : "Relayer dijeda";
   el.btnRelayerCek.disabled = busy || relayerBusy;
-  el.btnRelayerKirim.disabled = busy || relayerBusy || !berjalan || !aktif;
+  el.btnRelayerKirim.disabled = busy || relayerBusy || !berjalan;
 
   let hint;
   if (relayerCtlMessage) hint = relayerCtlMessage;
-  else if (!aktif) {
-    hint = "Relayer sedang dijeda. Suara tetap aman di antrian, tetapi tidak dikirim ke blockchain sampai saklar dinyalakan lagi.";
-  } else if (!berjalan) {
+  else if (!berjalan) {
     hint = 'Siaga: relayer otomatis bekerja saat sesi voting berlangsung. Klik "Periksa relayer" untuk memastikan semuanya siap sebelum memulai sesi.';
   } else {
     hint = 'Relayer otomatis berjalan tiap menit. "Kirim sekarang" mengirim antrian saat ini juga, tanpa menunggu selang waktu dan batas minimal batch.';
@@ -1272,35 +1257,6 @@ async function runRelayerControl(aksi, labelBusy, button) {
     } catch (_) {
       /* tampilan diperbarui pada siklus berikutnya */
     }
-    render();
-  }
-}
-
-async function toggleRelayerAktif() {
-  if (busy || relayerBusy) return;
-  const aktif = el.relayerToggle.checked;
-  if (!aktif && sesiBerjalanDb()) {
-    const lanjut = window.confirm(
-      "Sesi voting sedang berlangsung. Jika relayer dijeda, suara mahasiswa tidak dikirim ke blockchain dan sesi tidak bisa ditutup sampai relayer dilanjutkan. Jeda sekarang?"
-    );
-    if (!lanjut) {
-      el.relayerToggle.checked = true;
-      return;
-    }
-  }
-  relayerBusy = true;
-  relayerCtlMessage = "";
-  renderRelayerControls();
-  try {
-    const { error } = await sb.rpc("fn_set_relayer_aktif", { p_aktif: aktif });
-    if (error) throw new Error(error.message);
-    showToast("success", aktif ? "Relayer dilanjutkan." : "Relayer dijeda.");
-  } catch (e) {
-    relayerCtlMessage = `Gagal mengubah pengaturan relayer: ${e.message} (sudah menjalankan supabase/patch_relayer_otomatis.sql?)`;
-    showToast("error", "Gagal mengubah pengaturan relayer.");
-  } finally {
-    relayerBusy = false;
-    await loadRelayerRow();
     render();
   }
 }
@@ -1596,7 +1552,6 @@ el.btnOpen.addEventListener("click", () => openConfirm("open"));
 el.btnClose.addEventListener("click", () => openConfirm("close"));
 el.btnSetRelayer.addEventListener("click", () => openConfirm("relayer"));
 el.relayerInput.addEventListener("input", renderRelayerForm);
-el.relayerToggle.addEventListener("change", toggleRelayerAktif);
 el.kontrakInput.addEventListener("input", renderKontrakPanel);
 el.kontrakReset.addEventListener("change", renderKontrakPanel);
 el.btnSetKontrak.addEventListener("click", () => openConfirm("kontrak"));
