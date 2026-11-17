@@ -1,6 +1,14 @@
 # E-Voting HMTI — Versi HTML/CSS/JS Murni
 
-Tanpa React/Next.js — hanya HTML, CSS, dan JavaScript biasa. Library dimuat lewat `<script>` CDN (Supabase, PapaParse, GSAP, ethers.js), jadi **aplikasi webnya tidak perlu `npm install` atau proses build**. (Folder `blockchain/` punya `npm` sendiri, hanya untuk menguji kontrak.)
+Aplikasi e-voting pemilihan Ketua HMTI yang dibuat tanpa React/Next.js — hanya HTML, CSS, dan JavaScript biasa. Library dimuat lewat `<script>` CDN (Supabase, PapaParse, GSAP, ethers.js), jadi **aplikasi webnya tidak perlu `npm install` atau proses build**. (Folder `blockchain/` punya `npm` sendiri, hanya untuk menguji kontrak.)
+
+Sistem ini terdiri dari tiga bagian yang bekerja bersama:
+
+| Bagian | Peran |
+|---|---|
+| **Web (HTML/CSS/JS)** | Antarmuka mahasiswa dan admin: pendaftaran, login, kandidat, voting, sesi, dan hasil |
+| **Supabase** | Database (akun, kandidat, antrian suara), penyimpanan file (foto kandidat dan KTM), dan fungsi database |
+| **Blockchain (smart contract)** | Mencatat sesi voting, daftar nomor paslon, dan hitungan suara |
 
 ## Struktur File
 
@@ -15,7 +23,6 @@ admin/
   kandidat.html          → Data kandidat (card + form tambah)   (js/Kandidat.js)
   sesi-voting.html       → Buka/tutup sesi lewat blockchain     (js/Sesivoting.js)
   list-voting.html       → Status voting + ekspor CSV SKP       (js/Listvoting.js)
-  tambah-siswa.html      → Upload CSV data mahasiswa            (js/Tambahsiswa.js)
 
 css/
   style.css              → Styling global & komponen bersama (modal, card kandidat, tabel, sidebar)
@@ -52,101 +59,122 @@ File ini aman untuk dua kondisi:
 
 Skrip juga aman dijalankan berulang kali.
 
-### Penamaan tabel
+### Tabel
 
-| Tabel | Fungsi | Sebelumnya |
+| Tabel | Fungsi |
+|---|---|
+| `tb_pengguna` | Akun mahasiswa & admin, status persetujuan (`pending`/`approved`/`rejected`), status sudah voting, dan lokasi file KTM |
+| `tb_kandidat` | Data calon Ketua (nomor paslon, nama, visi, misi, catatan) + `foto_path` |
+| `tb_sesi_voting` | Status sesi: `belum_mulai` → `berlangsung` → `menutup` → `selesai`. Hanya satu baris |
+| `tb_antrian_suara` | Antrian suara yang menunggu dikirim relayer ke blockchain (status `menunggu` / `diproses` / `terkirim`) |
+| `tb_status_relayer` | Kondisi relayer: aktif atau dijeda, terakhir kirim, total terkirim, error terakhir |
+| `tb_pengaturan_kontrak` | Alamat kontrak `VotingSession` yang sedang aktif |
+| `tb_riwayat_kontrak` | Jejak setiap penggantian alamat kontrak |
+| `tb_log_admin` | Tidak lagi dipakai (riwayat sesi dibaca langsung dari blockchain). Aman dibiarkan atau dihapus |
+
+### Fungsi database
+
+| Fungsi | Dipanggil oleh | Tugas |
 |---|---|---|
-| `tb_pengguna` | Akun login mahasiswa & admin, status persetujuan, status sudah voting | `profiles` |
-| `tb_kandidat` | Data calon Ketua + `foto_path` (menu Kandidat) | *baru* |
-| `tb_log_admin` | Riwayat buka/tutup sesi voting yang tampil di landing page | *baru* |
-| `tb_suara` | Suara anonim — **tidak punya kolom yang menunjuk ke pemilih** | *baru* |
+| `fn_daftar_mahasiswa` | Mahasiswa saat mendaftar | Menghubungkan akun login dengan data NIM dan menyimpan lokasi file KTM |
+| `fn_admin_tolak_pendaftaran` | Admin | Menolak pendaftaran: menghapus file KTM dan akunnya |
+| `fn_kirim_suara` | Mahasiswa saat memilih | Memeriksa hak pilih dan sesi, menandai sudah memilih, lalu memasukkan suara ke antrian |
+| `fn_ringkasan_suara` | Landing page & admin | Ringkasan jumlah mahasiswa yang memilih dan isi antrian |
+| `fn_set_kontrak` | Admin (menu Sesi Voting) | Mengganti alamat kontrak aktif, opsional mereset data pemilihan lama |
+| `fn_set_relayer_aktif` | Admin | Menjeda atau mengaktifkan relayer |
+| `fn_ambil_batch_suara`, `fn_tandai_batch_terkirim`, `fn_lepas_batch`, `fn_lepas_kedaluwarsa` | Relayer | Mengambil batch suara, menandainya terkirim, mengembalikannya ke antrian, atau melepas batch yang tersangkut |
 
-### Foto kandidat
+### Penyimpanan file (Supabase Storage)
 
-Foto disimpan di **Supabase Storage** (bucket `foto-kandidat`, dibuat otomatis oleh `schema.sql`), sedangkan lokasi filenya dicatat di kolom `tb_kandidat.foto_path`. Batas: JPG/PNG/WEBP, maksimal 2 MB. Hanya admin yang boleh upload/hapus; foto bisa dilihat semua pemilih. Saat kandidat dihapus atau fotonya diganti, file lama ikut dibersihkan.
+- **`foto-kandidat`** — foto pasangan calon. Format JPG/PNG/WEBP, maksimal 2 MB. Hanya admin yang boleh upload/hapus; foto tampil untuk semua pemilih. Saat kandidat dihapus atau fotonya diganti, file lama ikut dibersihkan.
+- **`ktm-mahasiswa`** — scan KTM (PDF) yang diunggah mahasiswa saat mendaftar. Admin melihatnya lewat tombol **Lihat Gambar** di halaman Konfirmasi Pendaftaran.
 
-## 2. Kredensial Supabase
+## 2. Konfigurasi Supabase
 
-Isi dua baris di `js/Supabaseclient.js` (Supabase → Settings → API):
-
-```js
-const SUPABASE_URL = "https://xxxxxxxxxxxx.supabase.co";
-const SUPABASE_ANON_KEY = "isi-dengan-anon-public-key-anda";
-```
+Isi konfigurasi koneksi di `js/Supabaseclient.js` (URL dan key proyek dari Supabase → Settings → API).
 
 ### Sesi login admin dan mahasiswa dipisah
 
-Sesi login admin dan mahasiswa disimpan dengan kunci berbeda di browser (`evoting-admin-auth` dan `evoting-user-auth`, diatur di `js/Supabaseclient.js`). Jadi Anda bisa menguji admin dan mahasiswa **di browser yang sama** tanpa saling menghapus sesi. Semua halaman dashboard admin juga memeriksa dulu bahwa yang membukanya admin yang sedang login; jika tidak, otomatis dialihkan ke halaman login admin.
+Sesi login admin dan mahasiswa disimpan dengan kunci berbeda di browser (`evoting-admin-auth` dan `evoting-user-auth`, diatur di `js/Supabaseclient.js`). Jadi Anda bisa menguji admin dan mahasiswa **di browser yang sama** tanpa saling menghapus sesi. Semua halaman dashboard admin memeriksa dulu bahwa yang membukanya adalah admin yang sedang login; jika tidak, otomatis dialihkan ke halaman login admin.
 
 > Setelah memasang versi ini, login sekali lagi (sesi lama tersimpan di kunci yang berbeda).
 
 ### Notifikasi (toast)
 
-Kode toast ada langsung di bagian atas `Kandidat.js`, `Konfirmasi.js`, `Listvoting.js`, dan `Tambahsiswa.js` (fungsi `showToast`). Tampilannya diatur di `css/style.css` bagian **TOAST**.
+Kode toast ada langsung di bagian atas `Kandidat.js`, `Konfirmasi.js`, dan `Listvoting.js` (fungsi `showToast`). Tampilannya diatur di `css/style.css` bagian **TOAST**.
 
-## 2b. Blockchain: sesi dan suara
+## 3. Cara Kerja Sistem
 
-Smart contract `blockchain/VotingSession.sol` mencatat sesi voting, daftar nomor paslon, dan
-suara anonim. Ikuti **`blockchain/PANDUAN_DEPLOY.md`** untuk mendeploy kontrak, lalu
-**`relayer/PANDUAN_RELAYER.md`** untuk menjalankan relayer.
-
-Alur satu suara:
+### 3.1 Pendaftaran dan persetujuan
 
 ```
-Mahasiswa -> fungsi database -> antrian suara (tanpa identitas) -> RELAYER -> smart contract
+Mahasiswa daftar (NIM, nama, email, password, KTM PDF)
+      -> akun berstatus "pending"
+      -> admin meninjau KTM di Konfirmasi Pendaftaran
+      -> disetujui ("approved") atau ditolak
+      -> mahasiswa yang disetujui dapat login memakai NIM dan password
 ```
 
-1. Mahasiswa menekan **Ya, Kirim Suara**. Satu fungsi database memeriksa hak pilih, sesi, dan status
-   belum memilih; lalu dalam satu transaksi menandai `has_voted = true` **dan** memasukkan nomor
-   paslon ke antrian (`tb_antrian_suara`) yang **tidak memuat identitas maupun waktu memilih**.
-2. **Relayer** (program di `relayer/`, memakai wallet terpisah yang membayar gas) mengambil antrian
-   dalam **urutan acak** dan mengirimnya ke kontrak. Saat sesi berlangsung: tiap `INTERVAL_MENIT`
-   (bawaan 30) dan hanya jika suara menunggu minimal `MIN_BATCH` (bawaan 5).
-3. Setiap suara membawa ID acak; kontrak menolak ID yang sudah dihitung. Jadi relayer yang mati di
-   tengah jalan aman dijalankan lagi: suara tidak hilang dan tidak terhitung dua kali.
-4. **Menutup sesi bertahap** (halaman admin Sesi Voting): (a) database berhenti menerima suara baru,
-   (b) relayer mengirim semua sisa antrian, (c) baru sesi ditutup di blockchain lewat MetaMask.
-   Jika relayer tidak berjalan, penutupan menunggu, dan admin bisa membatalkannya.
-5. Setelah ditutup, **hasil akhir** dibaca dari kontrak dan ditampilkan di halaman admin serta
-   landing page mahasiswa.
+### 3.2 Menyiapkan pemilihan (admin)
 
-Hal lain yang perlu diketahui:
-- **Blockchain adalah sumber kebenaran** status sesi dan hitungan suara. Status sesi disalin ke
-  tabel `tb_sesi_voting` setelah transaksi terkonfirmasi, karena database tidak bisa membaca
-  blockchain langsung; salinan itulah yang dipakai server untuk menolak suara di luar sesi.
-- **Data kandidat dikunci** begitu sesi dibuka (nomor paslon didaftarkan permanen di kontrak).
-- **Pemeriksaan konsistensi** (admin dan landing page): jumlah suara di blockchain harus sesuai
-  dengan jumlah mahasiswa yang tercatat memilih dan isi antrian. Perbedaan menampilkan peringatan.
-- Riwayat buka/tutup sesi dan hasil di landing page dibaca **langsung dari blockchain** lewat RPC
-  publik, bukan dari database aplikasi.
+1. Menu **Kandidat**: tambahkan minimal 2 pasangan calon beserta foto.
+2. Menu **Sesi Voting**: hubungkan MetaMask, lalu atur alamat kontrak `VotingSession` yang sudah di-deploy.
+3. Mulai sesi. Nomor paslon didaftarkan ke kontrak, dan data kandidat **dikunci** sejak saat ini.
 
-## 3. Menjalankan
+### 3.3 Alur satu suara
+
+```
+Mahasiswa -> fungsi database -> antrian suara -> RELAYER -> smart contract
+```
+
+1. Mahasiswa membuka landing page, melihat kandidat, lalu menekan **Pilih Paslon** dan **Ya, Kirim Suara**. Satu fungsi database memeriksa hak pilih, status sesi, dan apakah mahasiswa sudah memilih. Dalam satu transaksi, fungsi itu menandai `has_voted = true` **dan** memasukkan nomor paslon ke antrian suara (`tb_antrian_suara`).
+2. **Relayer** (wallet terpisah yang membayar gas) mengambil antrian dalam **urutan acak** dan mengirimnya ke kontrak. Saat sesi berlangsung, pengiriman dilakukan tiap `INTERVAL_MENIT` (bawaan 30) dan hanya jika suara yang menunggu minimal `MIN_BATCH` (bawaan 5).
+3. Setiap suara membawa ID acak, dan kontrak menolak ID yang sudah dihitung. Jadi relayer yang berhenti di tengah jalan aman dijalankan lagi: suara tidak hilang dan tidak terhitung dua kali.
+4. Status suara di antrian berubah `menunggu` → `diproses` → `terkirim`. Batch yang tersangkut dikembalikan ke `menunggu` setelah melewati batas waktu.
+
+### 3.4 Menjalankan relayer
+
+Relayer dapat dijalankan dengan dua cara:
+- **Program Node.js** di folder `relayer/` (`npm start`), lihat `relayer/PANDUAN_RELAYER.md`.
+- **Edge Function Supabase** bernama `relayer`, dipanggil otomatis oleh penjadwal database (`pg_cron`) tiap menit selama sesi berstatus `berlangsung` atau `menutup`. Di luar itu tidak ada panggilan. Admin dapat menjeda relayer lewat saklar di halaman Sesi Voting.
+
+### 3.5 Menutup sesi bertahap
+
+Penutupan dilakukan lewat halaman admin **Sesi Voting**:
+
+1. Database berhenti menerima suara baru (status `menutup`).
+2. Relayer mengirim semua sisa antrian, berapa pun jumlahnya.
+3. Setelah antrian kosong, sesi ditutup di blockchain lewat MetaMask (status `selesai`).
+
+Jika relayer tidak berjalan, penutupan menunggu, dan admin bisa membatalkannya (kembali ke `berlangsung`).
+
+### 3.6 Hasil akhir
+
+Setelah sesi ditutup, **hasil akhir** dibaca dari kontrak dan ditampilkan di halaman admin serta landing page mahasiswa. Halaman **List Voting** menampilkan status voting tiap mahasiswa dan dapat mengekspor data partisipan ke CSV untuk klaim SKP.
+
+### 3.7 Hal lain yang perlu diketahui
+
+- **Blockchain adalah sumber kebenaran** status sesi dan hitungan suara. Status sesi disalin ke tabel `tb_sesi_voting` setelah transaksi terkonfirmasi, karena database tidak bisa membaca blockchain langsung. Salinan itulah yang dipakai fungsi database untuk menolak suara di luar sesi.
+- **Urutan status sesi hanya maju:** `belum_mulai` → `berlangsung` → `menutup` → `selesai`. Satu-satunya langkah mundur yang diizinkan adalah `menutup` → `berlangsung` (membatalkan penutupan). Sesi yang sudah selesai tidak bisa dibuka lagi.
+- **Pemeriksaan konsistensi** (halaman admin dan landing page): jumlah suara di blockchain dibandingkan dengan jumlah mahasiswa yang tercatat memilih dan isi antrian. Jika berbeda, muncul peringatan.
+- **Riwayat buka/tutup sesi dan hasil** di landing page dibaca langsung dari blockchain lewat RPC publik, bukan dari database aplikasi.
+- **Pemilihan baru:** ganti alamat kontrak lewat menu Sesi Voting dengan opsi reset. Status sesi kembali ke `belum_mulai`, antrian suara dikosongkan, dan status "sudah memilih" direset. Akun mahasiswa dan data kandidat tetap.
+- **Sesi dibuka dan ditutup manual** oleh admin. Kontrak tidak memakai batas waktu otomatis.
+- **Jaringan uji.** Konfigurasi bawaan memakai Sepolia (tanpa uang sungguhan). RPC publik bawaan di `Blockchainconfig.js` bisa lambat; ganti dengan RPC gratis dari Alchemy/Infura bila perlu.
+
+## 4. Menjalankan
 
 Pakai server lokal sederhana (membuka lewat `file://` bisa diblokir browser):
 - VS Code: ekstensi **Live Server** → klik kanan `index.html` → *Open with Live Server*
 - atau `python3 -m http.server 3000` lalu buka `http://localhost:3000`
 
-## 4. Alur Pengujian
+## 5. Alur Pengujian
 
 1. Tambah akun admin lewat `supabase/tambah_admin.sql`, lalu login di `admin.html`
 2. Menu **Kandidat** → **+ Tambah Kandidat** → isi minimal 2 paslon
-3. Daftar mahasiswa di `index.html` → admin setujui lewat **Konfirmasi Pendaftaran**
-4. Login sebagai mahasiswa → masuk ke `landing.html`: nama tampil di header, kandidat tampil, klik **Pilih Paslon** → popup konfirmasi → **Ya, Kirim Suara**
-5. Menu **List Voting** menampilkan mahasiswa tsb berstatus *Sudah Voting*
-
-6. Deploy kontrak, jalankan relayer, lalu menu **Sesi Voting**: hubungkan MetaMask → **Mulai Sesi Voting** → konfirmasi. Tombol "Pilih Paslon" di sisi mahasiswa baru aktif setelah ini.
-7. Setelah mahasiswa memilih, relayer mengirim suara ke blockchain (untuk mencoba cepat: `MIN_BATCH=1`, `INTERVAL_MENIT=1` di `relayer/.env`, atau `npm run paksa`).
-8. **Tutup Sesi Voting** → sisa suara dikirim → konfirmasi penutupan di MetaMask → **Hasil Akhir** tampil.
-
-## 5. Catatan Penting (Status Fase Ini)
-
-- **Kerahasiaan pilihan bergantung pada server.** Blockchain menjamin hasil hitungan tidak bisa diubah, tetapi server melihat pasangan (pemilih, pilihan) sesaat sebelum memisahkannya. Pengacakan urutan dan batas minimal batch mengurangi risiko pencocokan lewat waktu, namun bukan jaminan kriptografis (blind signature / zero-knowledge berada di luar lingkup). Tulis ini sebagai batasan dan saran pengembangan.
-- **Hitungan sementara dapat dibaca publik.** Semua data blockchain publik, jadi hitungan per paslon bisa dibaca siapa saja kapan saja (berubah saat relayer mengirim batch). Aplikasi hanya menampilkan hasil setelah sesi ditutup.
-- **Penegakan sesi di sisi server memakai salinan database.** Admin yang mengendalikan database secara teknis bisa mengubah salinan itu, tetapi status tidak bisa mundur (penjaga di database), catatan buka/tutup tidak bisa diubah setelah terisi, dan landing page membandingkannya dengan blockchain sehingga perbedaan terlihat.
-- **Suara yang menunggu di antrian bisa dilihat pemilik database.** Selama menunggu dikirim (hingga satu interval), pilihan (tanpa identitas) ada di tabel antrian. Setelah terkirim, suara terkunci di blockchain.
-- **Relayer harus berjalan.** Jika mati, suara tertunda (tidak hilang) dan penutupan sesi menunggu. Lihat `relayer/PANDUAN_RELAYER.md`.
-- **Kontrak tidak punya batas waktu otomatis.** Sesi dibuka dan ditutup manual oleh admin.
-- **Data uji lama.** Akun yang sudah `has_voted` dari versi sebelumnya (suara di tabel lama `tb_suara`) membuat pemeriksaan konsistensi menampilkan peringatan; reset dengan SQL di bagian "Pemilihan baru" pada `blockchain/PANDUAN_DEPLOY.md`.
-- **Tabel `tb_log_admin` dan `tb_suara` sudah tidak dipakai.** Aman dibiarkan atau dihapus.
-- **Halaman admin disembunyikan, bukan dikunci.** Tautan ke `admin.html` sudah dihapus dari halaman mahasiswa, tetapi halamannya tetap bisa dibuka jika alamatnya diketahui, dan database masih menerima pendaftaran admin dari siapa pun yang memiliki anon key (yang memang tampil di `Supabaseclient.js` di browser). Sebelum dipakai sungguhan, tambahkan kode rahasia pendaftaran admin atau tutup pendaftaran admin setelah admin pertama dibuat.
-- **Jaringan uji.** Konfigurasi bawaan memakai Sepolia (tanpa uang sungguhan). RPC publik bawaan di `Blockchainconfig.js` bisa lambat; ganti dengan RPC gratis dari Alchemy/Infura bila perlu.
+3. Daftar mahasiswa di `index.html` (termasuk unggah KTM) → admin setujui lewat **Konfirmasi Pendaftaran**
+4. Deploy kontrak, jalankan relayer, lalu menu **Sesi Voting**: hubungkan MetaMask → **Mulai Sesi Voting** → konfirmasi. Tombol "Pilih Paslon" di sisi mahasiswa baru aktif setelah ini.
+5. Login sebagai mahasiswa → masuk ke `landing.html`: nama tampil di header, kandidat tampil, klik **Pilih Paslon** → popup konfirmasi → **Ya, Kirim Suara**
+6. Menu **List Voting** menampilkan mahasiswa tersebut berstatus *Sudah Voting*
+7. Setelah mahasiswa memilih, relayer mengirim suara ke blockchain (untuk mencoba cepat: `MIN_BATCH=1`, `INTERVAL_MENIT=1` di `relayer/.env`, atau `npm run paksa`)
+8. **Tutup Sesi Voting** → sisa suara dikirim → konfirmasi penutupan di MetaMask → **Hasil Akhir** tampil
