@@ -172,7 +172,9 @@ const Auth = {
     }
 
     const { error } = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/forgot-password.html`,
+      // Relatif terhadap halaman ini (forgot-password.html), jadi tetap benar di GitHub Pages
+      // berbentuk username.github.io/nama-repo/ maupun di domain sendiri.
+      redirectTo: new URL("forgot-password.html", window.location.href).href,
     });
 
     if (error) {

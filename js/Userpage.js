@@ -35,6 +35,46 @@ function hideStatus(elementId) {
   el.className = "status-msg hidden";
 }
 
+// --- Tombol mata: lihat / sembunyikan password ---
+const IKON_MATA =
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const IKON_MATA_CORET =
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.5 10.5 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.2"/><path d="M6.6 6.6A16.6 16.6 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+
+function pasangTombolMata(input) {
+  const wrap = document.createElement("div");
+  wrap.className = "password-wrap";
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "toggle-password";
+  wrap.appendChild(btn);
+
+  const atur = (tampil) => {
+    input.type = tampil ? "text" : "password";
+    btn.innerHTML = tampil ? IKON_MATA_CORET : IKON_MATA;
+    const label = tampil ? "Sembunyikan password" : "Tampilkan password";
+    btn.setAttribute("aria-label", label);
+    btn.setAttribute("aria-pressed", tampil ? "true" : "false");
+    btn.title = label;
+  };
+  atur(false);
+
+  btn.addEventListener("click", () => {
+    atur(input.type === "password");
+    input.focus();
+  });
+  // Setelah form di-reset (mis. selesai mendaftar), password kembali tersembunyi.
+  if (input.form) input.form.addEventListener("reset", () => atur(false));
+}
+
+["login-password", "reg-password", "reg-confirm-password"].forEach((id) => {
+  const input = document.getElementById(id);
+  if (input) pasangTombolMata(input);
+});
+
 // --- Form LOGIN ---
 const loginForm = document.getElementById("login-form");
 const loginSubmit = document.getElementById("login-submit");
@@ -88,6 +128,14 @@ async function perbaruiStatusPendaftaran() {
 
 perbaruiStatusPendaftaran();
 
+// Kolom NIM di form DAFTAR hanya menerima angka: karakter lain (huruf, spasi, tanda) dibuang saat diketik/ditempel.
+// Sengaja tidak dipasang di form Masuk maupun halaman admin.
+const regNimInput = document.getElementById("reg-nim");
+regNimInput.addEventListener("input", () => {
+  const bersih = regNimInput.value.replace(/[^0-9]/g, "");
+  if (bersih !== regNimInput.value) regNimInput.value = bersih;
+});
+
 registerForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   hideStatus("register-status");
@@ -100,6 +148,10 @@ registerForm.addEventListener("submit", async (e) => {
   const confirmPassword = document.getElementById("reg-confirm-password").value;
   const fileKtm = document.getElementById("reg-ktm").files[0];
 
+  if (!/^[0-9]+$/.test(nim)) {
+    showStatus("register-status", "error", "NIM hanya boleh berisi angka (tanpa huruf, spasi, atau tanda baca).");
+    return;
+  }
   if (password !== confirmPassword) {
     showStatus("register-status", "error", "Konfirmasi password tidak cocok.");
     return;
