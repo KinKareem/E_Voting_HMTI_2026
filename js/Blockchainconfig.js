@@ -24,6 +24,13 @@ const BLOCKCHAIN = {
   // Dipakai untuk tautan "Lihat transaksi" di halaman admin (boleh dikosongkan).
   EXPLORER_URL: "https://sepolia.etherscan.io",
 
+  // Dipakai halaman admin "Transaksi" untuk membaca RIWAYAT transaksi sebuah alamat.
+  // (RPC biasa tidak bisa menjawab "transaksi apa saja milik alamat ini", jadi dipakai API explorer Blockscout, gratis tanpa kunci.)
+  HISTORY_API_URL: "https://eth-sepolia.blockscout.com/api/v2",
+
+  // Batas saldo (dalam SepoliaETH) di bawah ini dianggap "Menipis" di halaman Transaksi.
+  LOW_BALANCE_ETH: { admin: 0.01, relayer: 0.05 },
+
   // Dipakai jika jaringan belum ada di MetaMask admin (Sepolia sudah bawaan MetaMask).
   NATIVE_CURRENCY: { name: "Sepolia Ether", symbol: "SepoliaETH", decimals: 18 },
 };

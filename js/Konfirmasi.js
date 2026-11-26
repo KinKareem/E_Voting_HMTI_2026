@@ -179,11 +179,24 @@ async function handleDecision(id, decision) {
       return;
     }
 
+    // Akun sudah terhapus. Sekarang hapus file KTM lewat Storage API (Supabase melarang
+    // `delete from storage.objects` langsung di SQL, jadi tidak bisa dilakukan di dalam fungsi database).
+    // Policy "ktm_mahasiswa: hapus folder sendiri atau admin" mengizinkan admin menghapusnya.
+    let ktmGagalDihapus = false;
+    if (target && target.ktm_path) {
+      const { error: errFile } = await sb.storage.from("ktm-mahasiswa").remove([target.ktm_path]);
+      if (errFile) ktmGagalDihapus = true;
+    }
+
     pendingList = pendingList.filter((p) => p.id !== id);
     renderTable();
 
     const who = target ? `${target.nama_lengkap} (${target.nim})` : "Mahasiswa";
-    showToast("success", `Pendaftaran ${who} ditolak dan datanya dihapus.`);
+    if (ktmGagalDihapus) {
+      showToast("info", `Pendaftaran ${who} ditolak dan akunnya dihapus, tetapi file KTM gagal dihapus. Hapus manual lewat Supabase Storage.`);
+    } else {
+      showToast("success", `Pendaftaran ${who} ditolak dan datanya dihapus.`);
+    }
     return;
   }
 

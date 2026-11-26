@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transaksi — Panel Admin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+
+<body>
+  <div class="admin-layout">
+    <div id="sidebar-root"></div>
+
+    <main class="dashboard-main">
+      <div class="dashboard-inner">
+        <header class="page-header">
+          <div>
+            <p class="page-eyebrow">Panel Admin</p>
+            <h1 class="page-title">Transaksi</h1>
+            <p class="page-subtitle" id="trx-subtitle">Memuat data blockchain...</p>
+          </div>
+          <button type="button" class="btn-outline" id="trx-refresh" style="width: auto; padding: 10px 18px">
+            Muat ulang
+          </button>
+        </header>
+
+        <div id="trx-status" class="status-msg hidden" role="status"></div>
+
+        <section class="trx-wallets" id="trx-wallets" aria-label="Saldo wallet"></section>
+
+        <div class="filter-row">
+          <div class="filter-pills" id="trx-filter">
+            <button type="button" class="filter-pill active" data-filter="semua">Semua</button>
+            <button type="button" class="filter-pill" data-filter="admin">Admin (buka &amp; tutup sesi)</button>
+            <button type="button" class="filter-pill" data-filter="relayer">Relayer (kirim suara)</button>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-scroll">
+            <div id="trx-content" class="empty-msg">Memuat data...</div>
+          </div>
+        </div>
+
+        <div class="trx-more">
+          <button type="button" class="btn-outline hidden" id="trx-more" style="width: auto; padding: 10px 18px">
+            Muat transaksi lebih lama
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/Sidebar.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script src="../js/Supabaseclient.js"></script>
+  <script src="../js/Blockchainconfig.js"></script>
+  <script src="../js/Blockchain.js"></script>
+  <script src="../js/Transaksi.js"></script>
+</body>
+
+</html>

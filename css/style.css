@@ -458,7 +458,7 @@ h3 {
     max-height: 2000px
   }
 
-  .auth-track:not(.show-register) .auth-pane:last-child,
+  .auth-track:not(.show-register) .auth-pane:last-child:not(:first-child),
   .auth-track.show-register .auth-pane:first-child {
     max-height: 0;
     overflow: hidden;
@@ -3145,4 +3145,140 @@ code {
 
 .toggle-password[aria-pressed="true"] {
   color: var(--brown)
+}
+
+/* =========================================================
+   HALAMAN TRANSAKSI (admin/transaksi.html)
+   ========================================================= */
+.trx-wallets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px
+}
+
+.trx-wallet {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--mist);
+  border-radius: 20px;
+  padding: 18px 20px;
+  box-shadow: 0 20px 40px -34px rgba(70, 40, 20, .5)
+}
+
+.trx-wallet.ok {
+  border-left-color: #2f9e5b
+}
+
+.trx-wallet.warn {
+  border-left-color: var(--amber)
+}
+
+.trx-wallet.bad {
+  border-left-color: #b91c1c
+}
+
+.trx-wallet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px
+}
+
+.trx-wallet-name {
+  font-size: 16px;
+  font-weight: 600
+}
+
+.trx-wallet-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--muted)
+}
+
+.trx-wallet-balance {
+  margin: 14px 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink)
+}
+
+.trx-wallet-addr {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  word-break: break-all
+}
+
+.trx-wallet-addr a {
+  text-decoration: underline;
+  text-underline-offset: 2px
+}
+
+.trx-wallet-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--espresso)
+}
+
+.trx-wallet-warn {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: #8a1c14
+}
+
+.trx-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--paper);
+  color: var(--muted)
+}
+
+.trx-badge.ok {
+  background: #dcfce7;
+  color: #166534
+}
+
+.trx-badge.warn {
+  background: #fff0d6;
+  color: #8d5815
+}
+
+.trx-badge.bad {
+  background: #fdecea;
+  color: #8a1c14
+}
+
+.trx-badge.admin {
+  background: #ece6f7;
+  color: #4b2e83
+}
+
+.trx-badge.relayer {
+  background: #e3eefb;
+  color: #1d4f91
+}
+
+.trx-table td {
+  font-size: 13px;
+  white-space: nowrap
+}
+
+.trx-table a {
+  text-decoration: underline;
+  text-underline-offset: 2px
+}
+
+.trx-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums
+}
+
+.trx-more {
+  margin-top: 16px;
+  text-align: center
 }
